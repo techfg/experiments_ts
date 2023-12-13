@@ -1,26 +1,30 @@
 
 
-/* TASK:
-* parse the following BNF grammar in a modular incremental manner:
-* 
-* breakfast => protein "with" breakfast "on the side" ;
-* breakfast => protein ;
-* breakfast => bread ;
-* 
-* protein => crispiness "crispy" "bacon" ;
-* protein => "sausage" ;
-* protein => cooked "eggs" ;
-* 
-* crispiness => "really" ;
-* crispiness => "really" crispiness ;
-* 
-* cooked => "scrambled" ;
-* cooked => "poached" ;
-* cooked => "fried" ;
-* 
-* bread => "toast" ;
-* bread => "biscuits" ;
-* bread => "english muffin" ;
+/* parse the following BNF grammar in a modular incremental manner:
+ * 
+ * breakfast => protein "with" breakfast "on the side" ;
+ * breakfast => protein ;
+ * breakfast => bread ;
+ * 
+ * protein => crispiness "crispy" "bacon" ;
+ * protein => "sausage" ;
+ * protein => cooked "eggs" ;
+ * 
+ * crispiness => "really" crispiness ;
+ * crispiness => "really" ;
+ * 
+ * cooked => "scrambled" ;
+ * cooked => "poached" ;
+ * cooked => "fried" ;
+ * 
+ * bread => "toast" ;
+ * bread => "biscuits" ;
+ * bread => "english muffin" ;
+ * 
+ * menu => "{" statements "}" ;
+ * statement => breakfast ";" ;
+ * statements => statement statements ;
+ * statements => statement ;
 */
 
 /*
@@ -236,7 +240,10 @@ const
 	cooked_token_kind = Symbol("cooked"),
 	crispiness_token_kind = Symbol("crispiness"),
 	bread_token_kind = Symbol("bread"),
-	protein_token_kind = Symbol("protein")
+	protein_token_kind = Symbol("protein"),
+	statement_token_kind = Symbol("statement"),
+	statements_token_kind = Symbol("statements"),
+	menu_token_kind = Symbol("menu")
 
 lex.addRule(crispiness_token_kind, "really")
 lex.addRule(crispiness_token_kind, ["really", crispiness_token_kind]) //auto-precedence (which will be -1) will put it at the top of the pattern match list (first pattern to get checked)
@@ -256,9 +263,24 @@ lex.addRule(bread_token_kind, "biscuits")
 lex.addRule(bread_token_kind, "english-muffin")
 lex.addRule(breakfast_token_kind, [bread_token_kind], 1)
 
+lex.addRule(menu_token_kind, ["{", statements_token_kind, "}"])
+lex.addRule(statements_token_kind, [statement_token_kind, statements_token_kind])
+lex.addRule(statements_token_kind, [statement_token_kind], 1)
+
+lex.addRule(statement_token_kind, [breakfast_token_kind, ";"])
+
 
 const token_tree1 = lex.matchRule(breakfast_token_kind, 0, "sausage with sausage on-the-side") // breakfast=>[ (protein="sausage"), breakfast=>[ (protein="sausage") ] ]
 const token_tree2 = lex.matchRule(breakfast_token_kind, 0, "sausage with toast on-the-side") // breakfast=>[ (protein="sausage"), breakfast=>[ (bread="toast") ] ]
 const token_tree3 = lex.matchRule(breakfast_token_kind, 0, "sausage with really really really crispy bacon with toast on-the-side on-the-side") // breakfast=>[ (protein="sausage"), breakfast=>[ protein=>[ crispiness=>[ crispiness=>[ (crispiness="really") ] ] ], breakfast=>[ (bread="toast") ] ] ]
-TokenTree_toString(token_tree3)
+const token_tree4 = lex.matchRule(menu_token_kind, 0, "{sausage with really really really crispy bacon with toast on-the-side on-the-side;}") // menu=>[ statements=>[ statement=>[ breakfast=>[ (protein="sausage"), breakfast=>[ protein=>[ crispiness=>[ crispiness=>[ (crispiness="really") ] ] ], breakfast=>[ (bread="toast") ] ] ] ] ] ]
+const token_tree5 = lex.matchRule(
+	menu_token_kind, 0,
+	`{
+		sausage with toast on-the-side;
+		really really crispy bacon with poached eggs with biscuits on-the-side on-the-side;
+		english-muffin;
+	}`
+) // menu=>[ statements=>[ statement=>[ breakfast=>[ (protein="sausage"), breakfast=>[ (bread="toast") ] ] ], statements=>[ statement=>[ breakfast=>[ protein=>[ crispiness=>[ (crispiness="really") ] ], breakfast=>[ protein=>[ (cooked="poached") ], breakfast=>[ (bread="biscuits") ] ] ] ], statements=>[ statement=>[ breakfast=>[ (bread="english-muffin") ] ] ] ] ] ]
+TokenTree_toString(token_tree5)
 
