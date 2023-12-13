@@ -1,119 +1,21 @@
-
-
-/* parse the following BNF grammar in a modular incremental manner:
- * 
- * breakfast => protein "with" breakfast "on the side" ;
- * breakfast => protein ;
- * breakfast => bread ;
- * 
- * protein => crispiness "crispy" "bacon" ;
- * protein => "sausage" ;
- * protein => cooked "eggs" ;
- * 
- * crispiness => "really" crispiness ;
- * crispiness => "really" ;
- * 
- * cooked => "scrambled" ;
- * cooked => "poached" ;
- * cooked => "fried" ;
- * 
- * bread => "toast" ;
- * bread => "biscuits" ;
- * bread => "english muffin" ;
- * 
- * menu => "{" statements "}" ;
- * statement => breakfast ";" ;
- * statements => statement statements ;
- * statements => statement ;
+/* TODO:
+ * - add dedicated feature for repititions so that we don't get an N-nested token tree for an N-repitition of a certain token
+ * - add `precedence === 0` implying auto placement of match rule based on the composite rule's array size (longest ones come first, shortest come later, atomic literals come last)
+ * - add regex pattern matching for atomic tokens. this will let you to define identifiers, string-literals, numbers, comments, and multi-line comments
 */
-
-/*
-This will be a chat on attempting to structure and build a Lexer + Parser + AST in Typescript, in a modular plugin style way.
-
-The first part will only focus on tackling Lexing to create tokens.
-To give an illustration of how the tokens should behave, first consider the following BNF grammar:
-```txt
-breakfast => protein "with" breakfast "on-the-side" ;
-breakfast => protein ;
-breakfast => bread ;
-
-protein => crispiness "crispy" "bacon" ;
-protein => "sausage" ;
-protein => cooked "eggs" ;
-
-crispiness => "really" ;
-crispiness => "really" crispiness ;
-
-cooked => "scrambled" ;
-cooked => "poached" ;
-cooked => "fried" ;
-
-bread => "toast" ;
-bread => "biscuits" ;
-bread => "english-muffin" ;
-```
-
-A token will be an object that also contains information about possible children tokens (`this.value`) which it could be composed of (think of it as a parse tree). here is what a token is defined as:
-```ts
-interface TokenTree {
-	// the position of the cursor (in the input text) AFTER this token has been identified
-	cursor: number
-	// specify the kind of token. for example: is it a "breakfast" token, or a "crispiness" token
-	kind: string
-	// the token's value specifies either its string-literal representation (atomic token), or can be composed of smaller tokens (composite token)
-	value?: string | TokenTree[]
-}
-```
-
-a `Tokenizer` is a function, specific to a certain kind of token, which can basically tokenize an input text, starting from a specific cursor position
-```ts
-type Tokenizer = (cursor: number, input: string) => TokenTree
-```
-
-if a `Tokenizer` should fail at matching the input, it should return a `NullToken`, with its `cursor` property dictating how far the cursor had reached before failing all possible match patterns. Note that it will be up to the caller of the Tokenizer function (which could be recursive as well) to deside what to do with the return `cursor` position propoerty of a possible `NullToken`, but generally it will be ignored because the caller will probably want to call other `Tokenizer` functions that may match the input, should the first `Tokenizer` return a `NullToken`.
-```ts
-interface NullToken extends TokenTree {
-	kind: "null"
-	value: never
-}
-```
-
-our goal is to add BNF-like rules to the system so that it can be step-by-step (or rule-by-rule to be more precise). this would allow one to add new grammar onto existing grammar. for example, we might later wish to include the following pattern for breakfast as well: `breakfast => breakfast "and" juice`, when we add a new definition for a `JuiceToken` later.
-note that the grammar will NEVER depend on left recursion.
-moreover, assume there are the following helper function for understanding whitespaces:
-- `is_whitespace(cursor: number, input_text: string): boolean` is the cursor on a whitespace?
-- `skip_whitespace(cursor: number, input_text: string): number` find the cursor position of the next non-whitespace. if `cursor` was already on a non-whitespace, then the same value of the cursor will be returned
-- `find_next_whitespace(cursor: number, input_text: string): number` find next cursor position of a whitespace. if cursor is already at a whitespace, the very same value will be returned.
-
-here is a general layout for how function/method calls will be made to create a tokenization ruleset for the grammar in the example:
-- define Breakfast
-- define Cooked
-- define Crispiness
-- define Bread
-- define Protein
-- addRule(Crispiness, "really")
-- addRule(Crispiness, ["really", Crispiness])
-- addRule(Cooked, "scrambled")
-- addRule(Cooked, "poached")
-- addRule(Cooked, "fried")
-- addRule(Bread, "toast")
-- addRule(Bread, "biscuits")
-- addRule(Bread, "english-muffin")
-- addRule(Breakfast, [Bread])
-- addRule(Protein, "sausage")
-- addRule(Protein, [Cooked, "eggs"])
-- addRule(Protein, [Crispiness, "crispy", "bacon"])
-- addRule(Breakfast, [Protein])
-- addRule(Breakfast, [Protein, "with", Breakfast "on-the-side"])
-*/
-
-// const BreakfastTokenKind = Symbol("breakfast")
 
 type TokenKind = symbol
 
+/** a token is an object representing a parse tree.
+ * it contains information about possible children tokens (`this.value`) which it could be composed of,
+ * or just a string-literal from the input text that's being tokenized.
+*/
 interface TokenTree {
+	/** the position of the cursor (in the input text) AFTER this token has been identified */
 	cursor: number
+	/** specify the kind of token. for example: is it a "breakfast" token, or a "crispiness" token ? */
 	kind: TokenKind
+	/** the token's value specifies either its string-literal representation (atomic token), or can be composed of smaller tokens (composite token) */
 	value?: string | TokenTree[]
 }
 
@@ -127,12 +29,14 @@ interface AtomicToken extends TokenTree {
 	value: string
 }
 
-const null_token_kind = Symbol("null")
+/** if a `Tokenizer` should fail at matching the input, it should return a `NullToken`, with its `cursor` property dictating how far the cursor had reached before failing all possible match patterns. Note that it will be up to the caller of the Tokenizer function (which could be recursive as well) to deside what to do with the return `cursor` position propoerty of a possible `NullToken`, but generally it will be ignored because the caller will probably want to call other `Tokenizer` functions that may match the input, should the first `Tokenizer` return a `NullToken`. */
 interface NullToken extends TokenTree {
 	kind: typeof null_token_kind
 	value: never
 }
+const null_token_kind = Symbol("null")
 
+/** a `Tokenizer` is a function, specific to a certain kind of token, which can basically tokenize an input text, starting from a specific cursor position */
 type Tokenizer = (cursor: number, input: string) => TokenTree
 
 const
@@ -155,10 +59,6 @@ const TokenTree_toString = (token: TokenTree): string => {
 		typeof value === "string" ?
 			"(" + kind.description + "=\"" + value + "\")" :
 			kind.description + "=>" + "[ " + value.map(TokenTree_toString).join(", ") + " ]"
-	// return value === undefined ? "" :
-	// 	typeof value === "string" ?
-	// 		"[ " + kind.description + "=\"" + value + "\" ]" :
-	// 		"[ " + kind.description + ": " + value.map(TokenTree_toString).join(", ") + " ]"
 }
 
 class Lexer {
@@ -233,6 +133,34 @@ class Lexer {
 
 
 
+/* TASK:
+ * parse the following BNF grammar in a modular incremental manner:
+ * 
+ * breakfast => protein "with" breakfast "on the side" ;
+ * breakfast => protein ;
+ * breakfast => bread ;
+ * 
+ * protein => crispiness "crispy" "bacon" ;
+ * protein => "sausage" ;
+ * protein => cooked "eggs" ;
+ * 
+ * crispiness => "really" crispiness ;
+ * crispiness => "really" ;
+ * 
+ * cooked => "scrambled" ;
+ * cooked => "poached" ;
+ * cooked => "fried" ;
+ * 
+ * bread => "toast" ;
+ * bread => "biscuits" ;
+ * bread => "english muffin" ;
+ * 
+ * menu => "{" statements "}" ;
+ * statement => breakfast ";" ;
+ * statements => statement statements ;
+ * statements => statement ;
+*/
+
 const lex = new Lexer()
 
 const
@@ -281,6 +209,38 @@ const token_tree5 = lex.matchRule(
 		really really crispy bacon with poached eggs with biscuits on-the-side on-the-side;
 		english-muffin;
 	}`
-) // menu=>[ statements=>[ statement=>[ breakfast=>[ (protein="sausage"), breakfast=>[ (bread="toast") ] ] ], statements=>[ statement=>[ breakfast=>[ protein=>[ crispiness=>[ (crispiness="really") ] ], breakfast=>[ protein=>[ (cooked="poached") ], breakfast=>[ (bread="biscuits") ] ] ] ], statements=>[ statement=>[ breakfast=>[ (bread="english-muffin") ] ] ] ] ] ]
-TokenTree_toString(token_tree5)
+)
+// menu=>[ statements=>[ statement=>[ breakfast=>[ (protein="sausage"), breakfast=>[ (bread="toast") ] ] ], statements=>[ statement=>[ breakfast=>[ protein=>[ crispiness=>[ (crispiness="really") ] ], breakfast=>[ protein=>[ (cooked="poached") ], breakfast=>[ (bread="biscuits") ] ] ] ], statements=>[ statement=>[ breakfast=>[ (bread="english-muffin") ] ] ] ] ] ]
 
+
+// declare that every menu is also a statement. this will allow nested menu
+lex.addRule(statement_token_kind, [menu_token_kind], -1)
+
+const token_tree6 = lex.matchRule(
+	menu_token_kind, 0,
+	`{{
+		sausage;
+		really crispy bacon with poached eggs with biscuits on-the-side on-the-side;
+		{english-muffin;}
+		{
+			really crispy bacon;
+			toast;
+		}
+	}}`
+)
+/*
+menu=>[ statements=>[ statement=>[ menu=>[
+	statements=>[
+		statement=>[ breakfast=>[ (protein="sausage") ] ],
+		statements=>[ statement=>[ breakfast=>[ protein=>[ (crispiness="really") ], breakfast=>[ protein=>[ (cooked="poached") ], breakfast=>[ (bread="biscuits") ] ] ] ],
+		statements=>[ statement=>[ menu=>[ statements=>[
+			statement=>[ breakfast=>[ (bread="english-muffin") ] ]
+		] ] ],
+		statements=>[ statement=>[ menu=>[ statements=>[
+			statement=>[ breakfast=>[ protein=>[ (crispiness="really") ] ] ],
+			statements=>[ statement=>[ breakfast=>[ (bread="toast") ] ] ]
+		] ] ] ]
+	] ] ]
+] ] ] ]
+*/
+TokenTree_toString(token_tree6)
