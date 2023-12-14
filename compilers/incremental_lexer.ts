@@ -4,7 +4,8 @@
  * TODO:
  * - add dedicated feature for repititions so that we don't get an N-nested token tree for an N-repitition of a certain token
  * - add `precedence === 0` implying auto placement of match rule based on the composite rule's array size (longest ones come first, shortest come later, atomic literals come last)
- * - add regex pattern matching for atomic tokens. this will let you to define identifiers, string-literals, numbers, comments, and multi-line comments
+ * - [DONE but needs documentation on caveats] add regex pattern matching for atomic tokens. this will let you to define identifiers, string-literals, numbers, comments, and multi-line comments
+ * - add regex pattern matching for composite tokens.
  * - figure out how this lexer will integrate with plugin-style compiler features pattern
  * 
  * @module
@@ -137,9 +138,8 @@ export class Lexer {
 	private addRuleAtomicKeyword<T extends AtomicToken>(kind: T["kind"], pattern: string, precedence: -1 | 1): void {
 		const tokenizers = this.rules.get(kind)!
 		const new_tokenizer = (cursor: number, input: string): T | NullToken => {
-			const value = input.slice(cursor, cursor + pattern.length)
-			return value === pattern ?
-				{ cursor: cursor + pattern.length, kind, value } as T :
+			return input.slice(cursor, cursor + pattern.length) === pattern ?
+				{ cursor: cursor + pattern.length, kind, value: pattern } as T :
 				{ cursor, kind: null_token_kind } as NullToken
 		}
 		precedence > 0 ?
@@ -148,7 +148,20 @@ export class Lexer {
 	}
 
 	private addRuleAtomicRegex<T extends AtomicToken>(kind: T["kind"], pattern: RegExp, precedence: -1 | 1): void {
-		// TODO
+		const tokenizers = this.rules.get(kind)!
+		const new_tokenizer = (cursor: number, input: string): T | NullToken => {
+			// pattern.lastIndex = 0
+			const
+				match = pattern.exec(input.substring(cursor)),
+				value = match?.[0],
+				index = match?.index
+			return index === 0 && value ?
+				{ cursor: cursor + value.length, kind, value } as T :
+				{ cursor, kind: null_token_kind } as NullToken
+		}
+		precedence > 0 ?
+			tokenizers.push(new_tokenizer) :
+			tokenizers.unshift(new_tokenizer)
 	}
 
 	private addRuleComposite<T extends CompositeToken>(kind: T["kind"], pattern: (string | RegExp | TokenKind)[], precedence: -1 | 1): void {
@@ -201,6 +214,7 @@ export class Lexer {
 	 * @returns the matched token, or a {@link NullToken | null token} if no match is found.
 	*/
 	matchRule<T extends AtomicToken | CompositeToken>(kind: T["kind"], cursor: number, input: string): T | NullToken {
+		cursor = skip_whitespace(cursor, input)
 		const tokenizers = this.rules.get(kind)!
 		for (const tokenizer of tokenizers) {
 			const token = tokenizer(cursor, input)

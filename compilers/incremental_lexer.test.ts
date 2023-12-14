@@ -3,7 +3,7 @@ import { Lexer, inline_next_token } from "./incremental_lexer.ts"
 /* TASK:
  * parse the following BNF grammar in a modular incremental manner:
  * 
- * breakfast => protein "with" (inline)breakfast "on the side" ;
+ * breakfast => protein "with" (inline)breakfast "on-the-side" ;
  * breakfast => protein ;
  * breakfast => bread ;
  * 
@@ -20,7 +20,7 @@ import { Lexer, inline_next_token } from "./incremental_lexer.ts"
  * 
  * bread => "toast" ;
  * bread => "biscuits" ;
- * bread => "english muffin" ;
+ * bread => "english-muffin" ;
  * 
  * menu => "{" statements "}" ;
  * statement => breakfast ";" ;
@@ -28,6 +28,11 @@ import { Lexer, inline_next_token } from "./incremental_lexer.ts"
  * statements => statement ;
  * 
  * statement => menu;
+ * 
+ * comment => regex("\/\/.*") ;
+ * multiline_comment => regex("\/\*.*?\*\/") ;
+ * statement => comment
+ * statement => multiline_comment
 */
 
 const lex = new Lexer()
@@ -40,7 +45,9 @@ const
 	protein_token_kind = Symbol("protein"),
 	statement_token_kind = Symbol("statement"),
 	statements_token_kind = Symbol("statements"),
-	menu_token_kind = Symbol("menu")
+	menu_token_kind = Symbol("menu"),
+	comment_token_kind = Symbol("comment"),
+	multiline_comment_token_kind = Symbol("multiline_comment")
 
 lex.addRule(crispiness_token_kind, "really")
 lex.addRule(crispiness_token_kind, ["really", crispiness_token_kind]) //auto-precedence (which will be -1) will put it at the top of the pattern match list (first pattern to get checked)
@@ -67,6 +74,15 @@ lex.addRule(statements_token_kind, [statement_token_kind], 1)
 lex.addRule(statement_token_kind, [breakfast_token_kind, ";"])
 
 
+// we always begin matching after skipping any whitespace between the previous token and the current token being scanned.
+// therefore including `^` in the begining of the regex pattern would give far better performance as it will not look for far away possible matches which do not interest us,
+// as we will just drop any matches that do not begin from where the cursor left off (i.e. any resulting `regex.exec(input.substring(cursor)).index > 0` will always be dropped)
+lex.addRule(comment_token_kind, new RegExp("^\\/\\/.*"))
+lex.addRule(statement_token_kind, [comment_token_kind], 1)
+
+lex.addRule(multiline_comment_token_kind, new RegExp("^\\/\\*[\\s\\S]*?\\*\\/"))
+lex.addRule(statement_token_kind, [multiline_comment_token_kind], 1)
+
 const token_tree1 = lex.matchRule(breakfast_token_kind, 0, "sausage with sausage on-the-side") // breakfast=>[ (protein="sausage"), (protein="sausage") ]
 const token_tree2 = lex.matchRule(breakfast_token_kind, 0, "sausage with toast on-the-side") // breakfast=>[ (protein="sausage"), (bread="toast") ]
 const token_tree3 = lex.matchRule(breakfast_token_kind, 0, "sausage with really really really crispy bacon with toast on-the-side on-the-side") // breakfast=>[ (protein="sausage"), protein=>[ crispiness=>[ crispiness=>[ (crispiness="really") ] ] ], (bread="toast") ]
@@ -81,7 +97,7 @@ const token_tree5 = lex.matchRule(
 )
 /*
 menu=>[ statements=>[
-	statement=>[breakfast=>[ (protein="sausage"), (bread="toast") ] ],
+	statement=>[ breakfast=>[ (protein="sausage"), (bread="toast") ] ],
 	statement=>[ breakfast=>[ protein=>[ crispiness=>[ (crispiness="really") ] ], protein=>[ (cooked="poached") ], (bread="biscuits") ] ],
 	statement=>[ breakfast=>[ (bread="english-muffin") ] ]
 ] ]
@@ -115,4 +131,38 @@ menu=>[ statements=>[ statement=>[ menu=>[ statements=>[
 	] ] ]
 ] ] ] ] ]
 */
-Lexer.tokenTreeToString(token_tree6)
+
+const token_tree7 = lex.matchRule(
+	menu_token_kind, 0,
+	`{{
+		sausage;
+		really crispy bacon with poached eggs with biscuits on-the-side on-the-side;
+		{english-muffin;} // give the english muffin to the dog
+		// also, what is the meaning of 42?
+		{
+			/* bacon is haram. so lend it to your chistian friend
+			/* lalala
+			*/
+			really crispy bacon;
+			toast; /* do naruto run with a toast hanging from your mouth while running off to school */
+		}
+	}}`
+)
+/*
+menu=>[ statements=>[ statement=>[ menu=>[ statements=>[
+	statement=>[ breakfast=>[ (protein="sausage") ] ],
+	statement=>[ breakfast=>[ protein=>[ (crispiness="really") ], protein=>[ (cooked="poached") ], (bread="biscuits") ] ],
+	statement=>[ menu=>[ statements=>[
+		statement=>[ breakfast=>[ (bread="english-muffin") ] ]
+	] ] ],
+	statement=>[ (comment="// give the english muffin to the dog") ],
+	statement=>[ (comment="// also, what is the meaning of 42?") ],
+	statement=>[ menu=>[ statements=>[
+		statement=>[ (multiline_comment="\/* bacon is haram. so lend it to your chistian friend\n\t\t\t\/* lalala\n\t\t\t*\/") ],
+		statement=>[ breakfast=>[ protein=>[ (crispiness="really") ] ] ],
+		statement=>[ breakfast=>[ (bread="toast") ] ],
+		statement=>[ (multiline_comment="\/* do naruto run with a toast hanging from your mouth while running off to school *\/") ]
+	] ] ]
+] ] ] ] ]
+*/
+Lexer.tokenTreeToString(token_tree7)
