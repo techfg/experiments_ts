@@ -1,13 +1,22 @@
-/* TODO:
+/** this library provides a modular lexer with a plugin-style approach for tokenization. <br>
+ * it allows the incremental addition of tokenization rules and supports features like inlining, repetitions, and regex pattern matching for atomic tokens.
+ * 
+ * TODO:
  * - add dedicated feature for repititions so that we don't get an N-nested token tree for an N-repitition of a certain token
  * - add `precedence === 0` implying auto placement of match rule based on the composite rule's array size (longest ones come first, shortest come later, atomic literals come last)
  * - add regex pattern matching for atomic tokens. this will let you to define identifiers, string-literals, numbers, comments, and multi-line comments
- * - [DONE] add an `inline` inlining control token inside of composite rule that will prevent recursion/nesting of the previous (or next) token
+ * - figure out how this lexer will integrate with plugin-style compiler features pattern
+ * 
+ * @module
 */
 
-type TokenKind = symbol
-type ControlToken = TokenKind
-const
+/** represents the type for token kinds in the lexer. each unique token kind is represented by a distinct symbol. */
+export type TokenKind = symbol
+/** represents a control token, which is a specialized form of a token kind.
+ * these are used for specifying a certain rule for the upcoming token(s)
+*/
+export type ControlToken = TokenKind
+export const
 	null_token_kind: TokenKind = Symbol("null"),
 	/** use inlining with caution as it changes the structure of the resulting tree. the new tree would no longer correctly represent the flow of the recursive parsing */
 	inline_next_token: ControlToken = Symbol("inline next token"),
@@ -20,7 +29,7 @@ const
  * it contains information about possible children tokens (`this.value`) which it could be composed of,
  * or just a string-literal from the input text that's being tokenized.
 */
-interface TokenTree {
+export interface TokenTree {
 	/** the position of the cursor (in the input text) AFTER this token has been identified */
 	cursor: number
 	/** specify the kind of token. for example: is it a "breakfast" token, or a "crispiness" token ? */
@@ -29,38 +38,51 @@ interface TokenTree {
 	value?: string | TokenTree[]
 }
 
-interface CompositeToken extends TokenTree {
+export interface CompositeToken extends TokenTree {
 	cursor: number
 	value: TokenTree[]
 }
 
-interface AtomicToken extends TokenTree {
+export interface AtomicToken extends TokenTree {
 	cursor: number
 	value: string
 }
 
-/** if a `Tokenizer` should fail at matching the input, it should return a `NullToken`, with its `cursor` property dictating how far the cursor had reached before failing all possible match patterns. Note that it will be up to the caller of the Tokenizer function (which could be recursive as well) to deside what to do with the return `cursor` position propoerty of a possible `NullToken`, but generally it will be ignored because the caller will probably want to call other `Tokenizer` functions that may match the input, should the first `Tokenizer` return a `NullToken`. */
-interface NullToken extends TokenTree {
+/** if a `Tokenizer` should fail at matching the input, it should return a `NullToken`, with its `cursor` property dictating how far the cursor had reached before failing all possible match patterns.
+ * note that it will be up to the caller of the `Tokenizer` function (which could be recursive as well) to decide what to do with the return `cursor` position propoerty of a possible `NullToken`.
+ * but generally it will be ignored because the caller will probably want to call other remaining `Tokenizer` functions that may match the input, should the first `Tokenizer` return a `NullToken`.
+*/
+export interface NullToken extends TokenTree {
 	kind: typeof null_token_kind
 	value: never
 }
 
-/** a `Tokenizer` is a function, specific to a certain kind of token, which can basically tokenize an input text, starting from a specific cursor position */
-type Tokenizer = (cursor: number, input: string) => TokenTree
+/** a `Tokenizer` is a function, specific to a certain kind of token, which can basically tokenize an input text, starting from a specific cursor position. */
+export type Tokenizer = (cursor: number, input: string) => TokenTree
 
 const
 	whitespace_chars = [" ".charCodeAt(0), "\t".charCodeAt(0), "\n".charCodeAt(0), "\r".charCodeAt(0)],
+	/** check if the cursor is on a whitespace character. */
 	is_whitespace = (cursor: number, input_text: string): boolean => {
 		return whitespace_chars.includes(input_text.charCodeAt(cursor))
 	},
+	/* move the cursor to the next non-whitespace position. */
 	skip_whitespace = (cursor: number, input_text: string): number => {
 		while (is_whitespace(cursor, input_text)) { cursor += 1 }
 		return cursor
 	},
+	/** find the cursor position of the next whitespace character. */
 	find_next_whitespace = (cursor: number, input_text: string): number => {
 		while (!is_whitespace(cursor, input_text)) { cursor += 1 }
 		return cursor
 	},
+	/** collect tokens at a certain depth in the token tree.
+	 * leaf nodes/endpoints that exist before the depth is reached, will not be collected.
+	 * @param node the current token tree node.
+	 * @param depth the depth at which tokens should be collected.
+	 * @param collection an array to store the collected tokens.
+	 * @returns the array of collected tokens.
+	*/
 	collect_at_depth = (node: TokenTree, depth: number, collection: TokenTree[] = []): TokenTree[] => {
 		const value = node.value
 		// base case: if depth is 0, return the node itself wrapped around the return array
@@ -74,21 +96,24 @@ const
 		return collection
 	}
 
-const TokenTree_toString = (token: TokenTree): string => {
-	const { kind, value } = token
-	return value === undefined ? "" :
-		typeof value === "string" ?
-			"(" + kind.description + "=\"" + value + "\")" :
-			kind.description + "=>" + "[ " + value.map(TokenTree_toString).join(", ") + " ]"
-}
-
-class Lexer {
+/** the Lexer class manages tokenization rules and provides a method for adding rules. */
+export class Lexer {
 	private rules: Map<TokenKind, Tokenizer[]> = new Map()
 
 	constructor() { }
 
+	/** add a tokenization rule for an atomic token.
+	 * @param kind the kind of token to be matched.
+	 * @param pattern the pattern to be matched (string or regex).
+	 * @param precedence precedence of the rule. `1` places the rule at the end, `-1` place it at the beginning.
+	*/
 	addRule<T extends AtomicToken>(kind: T["kind"], pattern: string, precedence?: -1 | 1): void
 	addRule<T extends AtomicToken>(kind: T["kind"], pattern: RegExp, precedence?: -1 | 1): void
+	/** add a tokenization rule for a composite token.
+	 * @param kind the kind of token to be matched.
+	 * @param pattern an array of other tokens, strings, or regex to match. composite tokens will be resolved recursively, by matching using their own rule set.
+	 * @param precedence precedence of the rule. `1` places the rule at the end, `-1` place it at the beginning.
+	*/
 	addRule<T extends CompositeToken>(kind: T["kind"], pattern: (string | RegExp | TokenKind)[], precedence?: -1 | 1): void
 	addRule<T extends AtomicToken | CompositeToken>(
 		kind: T["kind"],
@@ -169,6 +194,12 @@ class Lexer {
 			tokenizers.unshift(new_tokenizer)
 	}
 
+	/** match a rule for a given token kind.
+	 * @param kind the kind of token to match.
+	 * @param cursor the current cursor position. use `0` for starting from the begining.
+	 * @param input the input text being tokenized.
+	 * @returns the matched token, or a {@link NullToken | null token} if no match is found.
+	*/
 	matchRule<T extends AtomicToken | CompositeToken>(kind: T["kind"], cursor: number, input: string): T | NullToken {
 		const tokenizers = this.rules.get(kind)!
 		for (const tokenizer of tokenizers) {
@@ -178,6 +209,12 @@ class Lexer {
 		return { cursor, kind: null_token_kind } as NullToken
 	}
 
+	/** convert a token tree to a string representation. <br>
+	 * - composite tokens are represented as `the_token_kind=>[ first_subtoken_kind, second_subtoken_kind, ... ]` <br>
+	 * - atomic tokens are represented as `(the_token_kind="its_literal_value")`
+	 * @param token the token tree to convert to a string.
+	 * @returns the string representation of the token tree.
+	*/
 	static tokenTreeToString = (token: TokenTree): string => {
 		const { kind, value } = token
 		return value === undefined ? "" :
@@ -186,122 +223,3 @@ class Lexer {
 				kind.description + "=>" + "[ " + value.map(this.tokenTreeToString).join(", ") + " ]"
 	}
 }
-
-
-
-/* TASK:
- * parse the following BNF grammar in a modular incremental manner:
- * 
- * breakfast => protein "with" (inline)breakfast "on the side" ;
- * breakfast => protein ;
- * breakfast => bread ;
- * 
- * protein => crispiness "crispy" "bacon" ;
- * protein => "sausage" ;
- * protein => cooked "eggs" ;
- * 
- * crispiness => "really" crispiness ;
- * crispiness => "really" ;
- * 
- * cooked => "scrambled" ;
- * cooked => "poached" ;
- * cooked => "fried" ;
- * 
- * bread => "toast" ;
- * bread => "biscuits" ;
- * bread => "english muffin" ;
- * 
- * menu => "{" statements "}" ;
- * statement => breakfast ";" ;
- * statements => statement (inline)statements ;
- * statements => statement ;
- * 
- * statement => menu;
-*/
-
-const lex = new Lexer()
-
-const
-	breakfast_token_kind = Symbol("breakfast"),
-	cooked_token_kind = Symbol("cooked"),
-	crispiness_token_kind = Symbol("crispiness"),
-	bread_token_kind = Symbol("bread"),
-	protein_token_kind = Symbol("protein"),
-	statement_token_kind = Symbol("statement"),
-	statements_token_kind = Symbol("statements"),
-	menu_token_kind = Symbol("menu")
-
-lex.addRule(crispiness_token_kind, "really")
-lex.addRule(crispiness_token_kind, ["really", crispiness_token_kind]) //auto-precedence (which will be -1) will put it at the top of the pattern match list (first pattern to get checked)
-lex.addRule(cooked_token_kind, "scrambled")
-lex.addRule(cooked_token_kind, "poached")
-lex.addRule(cooked_token_kind, "fried")
-
-lex.addRule(breakfast_token_kind, [protein_token_kind, "with", inline_next_token, breakfast_token_kind, "on-the-side"], -1)
-
-lex.addRule(protein_token_kind, [crispiness_token_kind, "crispy", "bacon"])
-lex.addRule(protein_token_kind, [cooked_token_kind, "eggs"])
-lex.addRule(protein_token_kind, "sausage")
-lex.addRule(breakfast_token_kind, [protein_token_kind], 1)
-
-lex.addRule(bread_token_kind, "toast")
-lex.addRule(bread_token_kind, "biscuits")
-lex.addRule(bread_token_kind, "english-muffin")
-lex.addRule(breakfast_token_kind, [bread_token_kind], 1)
-
-lex.addRule(menu_token_kind, ["{", statements_token_kind, "}"])
-lex.addRule(statements_token_kind, [statement_token_kind, inline_next_token, statements_token_kind])
-lex.addRule(statements_token_kind, [statement_token_kind], 1)
-
-lex.addRule(statement_token_kind, [breakfast_token_kind, ";"])
-
-
-const token_tree1 = lex.matchRule(breakfast_token_kind, 0, "sausage with sausage on-the-side") // breakfast=>[ (protein="sausage"), (protein="sausage") ]
-const token_tree2 = lex.matchRule(breakfast_token_kind, 0, "sausage with toast on-the-side") // breakfast=>[ (protein="sausage"), (bread="toast") ]
-const token_tree3 = lex.matchRule(breakfast_token_kind, 0, "sausage with really really really crispy bacon with toast on-the-side on-the-side") // breakfast=>[ (protein="sausage"), protein=>[ crispiness=>[ crispiness=>[ (crispiness="really") ] ] ], (bread="toast") ]
-const token_tree4 = lex.matchRule(menu_token_kind, 0, "{sausage with really really really crispy bacon with toast on-the-side on-the-side;}") // menu=>[ statements=>[ statement=>[ breakfast=>[ (protein="sausage"), protein=>[ crispiness=>[ crispiness=>[ (crispiness="really") ] ] ], (bread="toast") ] ] ] ]
-const token_tree5 = lex.matchRule(
-	menu_token_kind, 0,
-	`{
-		sausage with toast on-the-side;
-		really really crispy bacon with poached eggs with biscuits on-the-side on-the-side;
-		english-muffin;
-	}`
-)
-/*
-menu=>[ statements=>[
-	statement=>[breakfast=>[ (protein="sausage"), (bread="toast") ] ],
-	statement=>[ breakfast=>[ protein=>[ crispiness=>[ (crispiness="really") ] ], protein=>[ (cooked="poached") ], (bread="biscuits") ] ],
-	statement=>[ breakfast=>[ (bread="english-muffin") ] ]
-] ]
-*/
-
-// declare that every menu is also a statement. this will allow nested menu
-lex.addRule(statement_token_kind, [menu_token_kind], -1)
-
-const token_tree6 = lex.matchRule(
-	menu_token_kind, 0,
-	`{{
-		sausage;
-		really crispy bacon with poached eggs with biscuits on-the-side on-the-side;
-		{english-muffin;}
-		{
-			really crispy bacon;
-			toast;
-		}
-	}}`
-)
-/*
-menu=>[ statements=>[ statement=>[ menu=>[ statements=>[
-	statement=>[ breakfast=>[ (protein="sausage") ] ],
-	statement=>[ breakfast=>[ protein=>[ (crispiness="really") ], protein=>[ (cooked="poached") ], (bread="biscuits") ] ],
-	statement=>[ menu=>[ statements=>[
-		statement=>[ breakfast=>[ (bread="english-muffin") ] ]
-	] ] ],
-	statement=>[ menu=>[ statements=>[
-		statement=>[ breakfast=>[ protein=>[ (crispiness="really") ] ] ],
-		statement=>[ breakfast=>[ (bread="toast") ] ]
-	] ] ]
-] ] ] ] ]
-*/
-Lexer.tokenTreeToString(token_tree6)
