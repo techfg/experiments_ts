@@ -5,7 +5,8 @@
  * - add dedicated feature for repititions so that we don't get an N-nested token tree for an N-repitition of a certain token
  * - add `precedence === 0` implying auto placement of match rule based on the composite rule's array size (longest ones come first, shortest come later, atomic literals come last)
  * - [DONE but needs documentation on caveats] add regex pattern matching for atomic tokens. this will let you to define identifiers, string-literals, numbers, comments, and multi-line comments
- * - add regex pattern matching for composite tokens.
+ * - [DONE but not tested yet] add regex pattern matching for composite tokens.
+ * - test when two or more `inline_next_token` composite tokens are used in succession. do they collect n-deep children values as intended?
  * - figure out how this lexer will integrate with plugin-style compiler features pattern
  * 
  * @module
@@ -19,6 +20,7 @@ export type TokenKind = symbol
 export type ControlToken = TokenKind
 export const
 	null_token_kind: TokenKind = Symbol("null"),
+	any_token_kind: TokenKind = Symbol("any"),
 	/** use inlining with caution as it changes the structure of the resulting tree. the new tree would no longer correctly represent the flow of the recursive parsing */
 	inline_next_token: ControlToken = Symbol("inline next token"),
 	repeat_zero_or_once: ControlToken = Symbol("repeat next token zero or one times"),
@@ -76,26 +78,44 @@ const
 	find_next_whitespace = (cursor: number, input_text: string): number => {
 		while (!is_whitespace(cursor, input_text)) { cursor += 1 }
 		return cursor
-	},
-	/** collect tokens at a certain depth in the token tree.
-	 * leaf nodes/endpoints that exist before the depth is reached, will not be collected.
-	 * @param node the current token tree node.
-	 * @param depth the depth at which tokens should be collected.
-	 * @param collection an array to store the collected tokens.
-	 * @returns the array of collected tokens.
-	*/
-	collect_at_depth = (node: TokenTree, depth: number, collection: TokenTree[] = []): TokenTree[] => {
-		const value = node.value
-		// base case: if depth is 0, return the node itself wrapped around the return array
-		if (depth <= 0) { collection.push(node) }
-		// intermediate children that turn out to be leaf nodes become excluded
-		else if (Array.isArray(value)) {
-			for (const child of value) {
-				collect_at_depth(child, depth - 1, collection)
-			}
-		}
-		return collection
 	}
+
+/** collect tokens at a certain depth in the token tree.
+ * leaf nodes/endpoints that exist before the depth is reached, will not be collected.
+ * @param node the current token tree node.
+ * @param depth the depth at which tokens should be collected.
+ * @param collection an array to store the collected tokens.
+ * @returns the array of collected tokens.
+*/
+const collect_at_depth = (node: TokenTree, depth: number, collection: TokenTree[] = []): TokenTree[] => {
+	const value = node.value
+	// base case: if depth is 0, return the node itself wrapped around the return array
+	if (depth <= 0) { collection.push(node) }
+	// intermediate children that turn out to be leaf nodes become excluded
+	else if (Array.isArray(value)) {
+		for (const child of value) {
+			collect_at_depth(child, depth - 1, collection)
+		}
+	}
+	return collection
+}
+
+const
+	match_pattern_literal = <T extends AtomicToken>(token_kind: T["kind"], pattern: string, cursor: number, input: string): T | NullToken => {
+		return input.substring(cursor, cursor + pattern.length) === pattern ?
+			{ cursor: cursor + pattern.length, kind: token_kind, value: pattern } as T :
+			{ cursor, kind: null_token_kind } as NullToken
+	},
+	match_pattern_regex = <T extends AtomicToken>(token_kind: T["kind"], pattern: RegExp, cursor: number, input: string): T | NullToken => {
+		const
+			match = pattern.exec(input.substring(cursor)),
+			value = match?.[0],
+			index = match?.index
+		return index === 0 && value ?
+			{ cursor: cursor + value.length, kind: token_kind, value } as T :
+			{ cursor, kind: null_token_kind } as NullToken
+	}
+
 
 /** the Lexer class manages tokenization rules and provides a method for adding rules. */
 export class Lexer {
@@ -136,29 +156,18 @@ export class Lexer {
 	}
 
 	private addRuleAtomicKeyword<T extends AtomicToken>(kind: T["kind"], pattern: string, precedence: -1 | 1): void {
-		const tokenizers = this.rules.get(kind)!
-		const new_tokenizer = (cursor: number, input: string): T | NullToken => {
-			return input.slice(cursor, cursor + pattern.length) === pattern ?
-				{ cursor: cursor + pattern.length, kind, value: pattern } as T :
-				{ cursor, kind: null_token_kind } as NullToken
-		}
+		const
+			tokenizers = this.rules.get(kind)!,
+			new_tokenizer = match_pattern_literal.bind(undefined, kind, pattern)
 		precedence > 0 ?
 			tokenizers.push(new_tokenizer) :
 			tokenizers.unshift(new_tokenizer)
 	}
 
 	private addRuleAtomicRegex<T extends AtomicToken>(kind: T["kind"], pattern: RegExp, precedence: -1 | 1): void {
-		const tokenizers = this.rules.get(kind)!
-		const new_tokenizer = (cursor: number, input: string): T | NullToken => {
-			// pattern.lastIndex = 0
-			const
-				match = pattern.exec(input.substring(cursor)),
-				value = match?.[0],
-				index = match?.index
-			return index === 0 && value ?
-				{ cursor: cursor + value.length, kind, value } as T :
-				{ cursor, kind: null_token_kind } as NullToken
-		}
+		const
+			tokenizers = this.rules.get(kind)!,
+			new_tokenizer = match_pattern_regex.bind(undefined, kind, pattern)
 		precedence > 0 ?
 			tokenizers.push(new_tokenizer) :
 			tokenizers.unshift(new_tokenizer)
@@ -172,13 +181,13 @@ export class Lexer {
 			for (const sub_pattern of pattern) {
 				cursor = skip_whitespace(cursor, input)
 				if (typeof sub_pattern === "string") {
-					const sub_pattern_len = sub_pattern.length
-					if (input.substring(cursor, cursor + sub_pattern_len) !== sub_pattern) {
-						return { cursor, kind: null_token_kind } as NullToken
-					}
-					cursor += sub_pattern_len
+					const token = match_pattern_literal(any_token_kind, sub_pattern, cursor, input)
+					if (token.kind === null_token_kind) { return token as NullToken }
+					cursor = token.cursor // equivalent to `cursor += sub_pattern.length`
 				} else if (sub_pattern instanceof RegExp) {
-					// TODO
+					const token = match_pattern_regex(any_token_kind, sub_pattern, cursor, input)
+					if (token.kind === null_token_kind) { return token as NullToken }
+					cursor = token.cursor
 				} else if (control_symbols.has(sub_pattern)) {
 					// TODO remaining control tokens
 					switch (sub_pattern) {

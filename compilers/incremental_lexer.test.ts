@@ -83,10 +83,14 @@ lex.addRule(statement_token_kind, [comment_token_kind], 1)
 lex.addRule(multiline_comment_token_kind, new RegExp("^\\/\\*[\\s\\S]*?\\*\\/"))
 lex.addRule(statement_token_kind, [multiline_comment_token_kind], 1)
 
-const token_tree1 = lex.matchRule(breakfast_token_kind, 0, "sausage with sausage on-the-side") // breakfast=>[ (protein="sausage"), (protein="sausage") ]
-const token_tree2 = lex.matchRule(breakfast_token_kind, 0, "sausage with toast on-the-side") // breakfast=>[ (protein="sausage"), (bread="toast") ]
-const token_tree3 = lex.matchRule(breakfast_token_kind, 0, "sausage with really really really crispy bacon with toast on-the-side on-the-side") // breakfast=>[ (protein="sausage"), protein=>[ crispiness=>[ crispiness=>[ (crispiness="really") ] ] ], (bread="toast") ]
-const token_tree4 = lex.matchRule(menu_token_kind, 0, "{sausage with really really really crispy bacon with toast on-the-side on-the-side;}") // menu=>[ statements=>[ statement=>[ breakfast=>[ (protein="sausage"), protein=>[ crispiness=>[ crispiness=>[ (crispiness="really") ] ] ], (bread="toast") ] ] ] ]
+const token_tree1 = lex.matchRule(breakfast_token_kind, 0, "sausage with sausage on-the-side")
+console.assert(Lexer.tokenTreeToString(token_tree1) === `breakfast=>[ (protein="sausage"), (protein="sausage") ]`)
+const token_tree2 = lex.matchRule(breakfast_token_kind, 0, "sausage with toast on-the-side")
+console.assert(Lexer.tokenTreeToString(token_tree2) === `breakfast=>[ (protein="sausage"), (bread="toast") ]`)
+const token_tree3 = lex.matchRule(breakfast_token_kind, 0, "sausage with really really really crispy bacon with toast on-the-side on-the-side")
+console.assert(Lexer.tokenTreeToString(token_tree3) === `breakfast=>[ (protein="sausage"), protein=>[ crispiness=>[ crispiness=>[ (crispiness="really") ] ] ], (bread="toast") ]`)
+const token_tree4 = lex.matchRule(menu_token_kind, 0, "{sausage with really really really crispy bacon with toast on-the-side on-the-side;}")
+console.assert(Lexer.tokenTreeToString(token_tree4) === `menu=>[ statements=>[ statement=>[ breakfast=>[ (protein="sausage"), protein=>[ crispiness=>[ crispiness=>[ (crispiness="really") ] ] ], (bread="toast") ] ] ] ]`)
 const token_tree5 = lex.matchRule(
 	menu_token_kind, 0,
 	`{
@@ -95,13 +99,13 @@ const token_tree5 = lex.matchRule(
 		english-muffin;
 	}`
 )
-/*
+console.assert(Lexer.tokenTreeToString(token_tree5) === `
 menu=>[ statements=>[
 	statement=>[ breakfast=>[ (protein="sausage"), (bread="toast") ] ],
 	statement=>[ breakfast=>[ protein=>[ crispiness=>[ (crispiness="really") ] ], protein=>[ (cooked="poached") ], (bread="biscuits") ] ],
 	statement=>[ breakfast=>[ (bread="english-muffin") ] ]
 ] ]
-*/
+`.replaceAll(/[\r\n\f\v]\t*/gm, " ").trim())
 
 // declare that every menu is also a statement. this will allow nested menu
 lex.addRule(statement_token_kind, [menu_token_kind], -1)
@@ -118,7 +122,7 @@ const token_tree6 = lex.matchRule(
 		}
 	}}`
 )
-/*
+console.assert(Lexer.tokenTreeToString(token_tree6) === `
 menu=>[ statements=>[ statement=>[ menu=>[ statements=>[
 	statement=>[ breakfast=>[ (protein="sausage") ] ],
 	statement=>[ breakfast=>[ protein=>[ (crispiness="really") ], protein=>[ (cooked="poached") ], (bread="biscuits") ] ],
@@ -130,7 +134,7 @@ menu=>[ statements=>[ statement=>[ menu=>[ statements=>[
 		statement=>[ breakfast=>[ (bread="toast") ] ]
 	] ] ]
 ] ] ] ] ]
-*/
+`.replaceAll(/[\r\n\f\v]\t*/gm, " ").trim())
 
 const token_tree7 = lex.matchRule(
 	menu_token_kind, 0,
@@ -148,7 +152,7 @@ const token_tree7 = lex.matchRule(
 		}
 	}}`
 )
-/*
+console.assert(Lexer.tokenTreeToString(token_tree7) === String.raw`
 menu=>[ statements=>[ statement=>[ menu=>[ statements=>[
 	statement=>[ breakfast=>[ (protein="sausage") ] ],
 	statement=>[ breakfast=>[ protein=>[ (crispiness="really") ], protein=>[ (cooked="poached") ], (bread="biscuits") ] ],
@@ -158,11 +162,11 @@ menu=>[ statements=>[ statement=>[ menu=>[ statements=>[
 	statement=>[ (comment="// give the english muffin to the dog") ],
 	statement=>[ (comment="// also, what is the meaning of 42?") ],
 	statement=>[ menu=>[ statements=>[
-		statement=>[ (multiline_comment="\/* bacon is haram. so lend it to your chistian friend\n\t\t\t\/* lalala\n\t\t\t*\/") ],
+		statement=>[ (multiline_comment="/* bacon is haram. so lend it to your chistian friend\n\t\t\t/* lalala\n\t\t\t*/") ],
 		statement=>[ breakfast=>[ protein=>[ (crispiness="really") ] ] ],
 		statement=>[ breakfast=>[ (bread="toast") ] ],
-		statement=>[ (multiline_comment="\/* do naruto run with a toast hanging from your mouth while running off to school *\/") ]
+		statement=>[ (multiline_comment="/* do naruto run with a toast hanging from your mouth while running off to school */") ]
 	] ] ]
 ] ] ] ] ]
-*/
+`.replaceAll(/[\r\n\f\v]\t*/gm, " ").replaceAll("\\n", "\n").replaceAll("\\t", "\t").trim())
 Lexer.tokenTreeToString(token_tree7)
