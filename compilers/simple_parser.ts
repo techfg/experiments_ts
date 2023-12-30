@@ -1,6 +1,6 @@
-import { SortedArray, Token, Keyword, Identifier, Assignment, Rune, isEmpty, NumberLiteral, lex, StringLiteral, BooleanLiteral, TokenKind } from "./simple_lexer.ts"
+import { Token, TokenKind } from "./simple_lexer.ts"
 
-type TypeofValueExtended<T> =
+export type TypeofValueExtended<T> =
 	T extends string ? "string" :
 	T extends number ? "number" :
 	T extends bigint ? "bigint" :
@@ -14,7 +14,7 @@ type TypeofValueExtended<T> =
 	T extends null ? "null" :
 	T extends object ? "object" : "unknown"
 
-function typeofExtended<T>(param: T): TypeofValueExtended<T> {
+export const typeofExtended = <T>(param: T): TypeofValueExtended<T> => {
 	let typeof_param: string = typeof param
 	if (typeof_param === "object") {
 		typeof_param =
@@ -27,19 +27,19 @@ function typeofExtended<T>(param: T): TypeofValueExtended<T> {
 }
 
 
-type ParseKind = symbol
+export type ParseKind = symbol
 
-interface ParseTree<T> {
+export interface ParseTree<T> {
 	kind: ParseKind
 	value: T
 	cursor: number
 }
 
-type ParseFunction<P extends ParseTree<any>> = (cursor: number, input: Token[]) => P | undefined
+export type ParseFunction<P extends ParseTree<any>> = (cursor: number, input: Token[]) => P | undefined
 
-interface Parser<P extends ParseTree<any>> {
-	parse: ParseFunction<P>
-}
+// export interface Parser<P extends ParseTree<any>> {
+// 	parse: ParseFunction<P>
+// }
 
 interface ParserConfig_MatchToken<T extends Token> {
 	kind?: T["kind"]
@@ -55,11 +55,18 @@ interface ParserConfig_MatchTree<P extends ParseTree<any>> {
 	transform?: (parse_tree: ParseTree<P>) => any
 }
 
-type ParserConfig_Match = ParserConfig_MatchToken<any> | ParserConfig_MatchTree<any>
+export type ParserConfig_Match = ParserConfig_MatchToken<any> | ParserConfig_MatchTree<any>
 
-const default_transform = (token: Token) => (token.value)
+export const default_transform = (token: Token) => (token.value)
+export const transform_parser_kind = (parser_kind: ParseKind, parser: ParseFunction<any>): typeof parser => {
+	return (cursor, input) => {
+		const output = parser(cursor, input)
+		if (output) { output.kind = parser_kind }
+		return output
+	}
+}
 
-class ParserContext {
+export class ParserContext {
 	private parsers: Map<ParseKind, ParseFunction<any>> = new Map()
 
 	addParser(kind: ParseKind, parser_fn: ParseFunction<any>) {
@@ -136,45 +143,14 @@ class ParserContext {
 			return matched ? output : undefined
 		}
 	}
+
+	// TODO
+	parseZeroOrOnce() { }
+
+	// TODO
+	parseZeroOrMore() { }
+
+	// TODO
+	parseOnceOrMore() { }
 }
-
-
-type ParseTree_LetStatement = ParseTree<[id: string, type_id: string, expression: any]>
-
-const parser_ctx = new ParserContext()
-const parse_kind_terminal_expression: ParseKind = Symbol("terminal expression")
-const parse_terminal_expression = parser_ctx.parseOneof(
-	{ kind: NumberLiteral, keep: true },
-	{ kind: StringLiteral, keep: true },
-	{ kind: BooleanLiteral, keep: true },
-)
-parser_ctx.addParser(
-	parse_kind_terminal_expression,
-	(cursor, input) => {
-		const output = parse_terminal_expression(cursor, input)
-		if (output) { output.kind = parse_kind_terminal_expression }
-		return output
-	}
-)
-
-const parse_kind_let_statement: ParseKind = Symbol("let statement")
-const parse_let_statement_subparser = parser_ctx.parseSequence(
-	{ kind: Keyword, pattern: "let", keep: false },
-	{ kind: Identifier, keep: true },
-	{ kind: Rune, pattern: ":", keep: false },
-	{ kind: Identifier, keep: true },
-	{ kind: Assignment, pattern: "=", keep: false },
-	{ pattern: parse_kind_terminal_expression, keep: true, transform: (ptree: ReturnType<typeof parse_terminal_expression>) => (ptree) },
-	{ kind: Rune, pattern: ";", keep: false },
-)
-parser_ctx.addParser(
-	parse_kind_let_statement,
-	(cursor, input) => {
-		const output = parse_let_statement_subparser(cursor, input)
-		if (output) { output.kind = parse_kind_let_statement }
-		return output
-	}
-)
-
-parser_ctx.getParser(parse_kind_let_statement)(0, lex.exec("let abc_d: string = 33;"))
 

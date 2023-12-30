@@ -1,25 +1,5 @@
 export type TokenKind = symbol
 
-export const
-	Comment: TokenKind = Symbol("comment"),
-	Keyword: TokenKind = Symbol("keyword"),
-	Assignment: TokenKind = Symbol("assignment"),
-	Operator: TokenKind = Symbol("operator"),
-	Rune: TokenKind = Symbol("rune"),
-	NumberLiteral: TokenKind = Symbol("number"),
-	StringLiteral: TokenKind = Symbol("string"),
-	BooleanLiteral: TokenKind = Symbol("boolean"),
-	NullLiteral: TokenKind = Symbol("null"),
-	Identifier: TokenKind = Symbol("identifier"),
-	Uncaught: TokenKind = Symbol("uncaught"),
-	/** token kinds in the order of their precedence */
-	token_kind_precedence: TokenKind[] = [
-		Uncaught, Identifier, NullLiteral,
-		BooleanLiteral, StringLiteral, NumberLiteral,
-		Rune, Operator, Assignment,
-		Keyword, Comment,
-	]
-
 export interface Token {
 	kind: TokenKind
 	value: string
@@ -146,22 +126,25 @@ export class SortedArray<T, K extends any = number> {
  * if it fails to tokenize, it should return `undefined`
 */
 export type Tokenizer = (cursor: number, input: string) => Token | undefined
-
+export const Uncaught: TokenKind = Symbol("tk:uncaught")
 export class LexerContext {
 	private rules = new SortedArray<Tokenizer, number>([], (a, b) => (b[0] - a[0]))
+	private precedence: Array<TokenKind>
 
-	constructor() {
+	constructor(precedence: Array<TokenKind>) {
+		precedence.unshift(Uncaught)
 		this.rules.insert((cursor: number, input: string) => {
 			new Error("uncaught substring starting at" + cursor + "\n\t" + input.substring(cursor, cursor + 100))
 			return undefined
-		}, token_kind_precedence.indexOf(Uncaught))
+		}, precedence.indexOf(Uncaught))
+		this.precedence = precedence
 	}
 
 	addRule(kind: TokenKind, pattern: string | RegExp) {
 		const tokenizer = typeof pattern === "string" ?
 			match_pattern_literal.bind(undefined, kind, pattern) :
 			match_pattern_regex.bind(undefined, kind, pattern)
-		this.rules.insert(tokenizer, token_kind_precedence.indexOf(kind))
+		this.rules.insert(tokenizer, this.precedence.indexOf(kind))
 	}
 
 	// TODO: implement `delRule` for deleting existing rules. the issue would be how to reference the added rule?
@@ -175,7 +158,7 @@ export class LexerContext {
 			input_len = input.length
 		let
 			cursor = 0,
-			prev_token: Token = { kind: Comment, value: "", cursor: 0 },
+			prev_token: Token = { kind: undefined as any, value: "", cursor: 0 },
 			success: Token | undefined = undefined
 		while (cursor < input_len && prev_token.kind !== Uncaught) {
 			success = undefined
@@ -196,71 +179,8 @@ export class LexerContext {
 }
 
 
-// typescript lexing example
 
-export const lex = new LexerContext()
-lex.addRule(Comment, new RegExp("^\\/\\/.*")) // line comment
-lex.addRule(Comment, new RegExp("^\\/\\*[\\s\\S]*?\\*\\/")) // multiline comment
-lex.addRule(StringLiteral, new RegExp("^\"(?:[^\"\\\\]|\\\\.)*\"")) // double quoted string literal which does not prematurely stop at escaped quotation marks `\"`
-lex.addRule(NumberLiteral, new RegExp("^\\d+(\\.\\d*)?")) // number literal
-lex.addRule(Identifier, new RegExp("^[a-zA-Z_]\\w*")) // any identifier (whether a variable, function, or a type)
-lex.addRule(BooleanLiteral, "true")
-lex.addRule(BooleanLiteral, "false")
-lex.addRule(NullLiteral, "undefined")
-lex.addRule(NullLiteral, "null")
-
-const keywords: string[] = [
-	"import", "export",
-	"let", "const", "function", "class", "enum",
-	"new", "extends", "implements",
-	"typeof", "instanceof", "type", "interface",
-	"for", "while", "of", "in", "break", "continue",
-	"if", "else if", "else",
-	"switch", "case", "default",
-	"try", "catch", "finally",
-	"return", "yield", "delete",
-]
-keywords.forEach((kw) => { lex.addRule(Keyword, kw) })
-
-const assignments: string[] = [
-	"**=", "+=", "-=", "*=", "/=", "%="
-]
-assignments.forEach((eq) => { lex.addRule(Assignment, eq) })
-lex.addRule(Assignment, new RegExp("^=(?!=)")) //do not capture equals signs that are followed by another equals sign
-
-const operators: string[] = [
-	"===", "==", "!==", "!=", "<=", ">=",
-	"**", "+", "-", "*", "/", "%",
-	"&&", "||", "!",
-	"&", "|", "^", "~", ">>>", "<<", ">>",
-	"<", ">", "??", "?.", "...", "."
-]
-operators.forEach((op) => { lex.addRule(Operator, op) })
-
-const runes: string[] = [
-	"$(", ")$", "(", ")",
-	"{", "}", "[", "]",
-	",", ":", ";",
-]
-runes.forEach((rn) => { lex.addRule(Rune, rn) })
-
-
-// run test
-console.log(lex.exec("let abcd: string = \"somebullshit\" ;"))
-console.log(lex.exec(`
-function fib$(T extends number)$(num: T, xyz: string): void {
-	num = fib((num - 1), (num - 2)) || true;
-	num += 55;
-	let str: string = "kill \\"ya selfu";
-	return "lukemia".length >= str.length ?? {
-		k: 42,
-		y: false === true,
-		s: "kys",
-	}
-};
-`))
-
-
+/*
 // combinator and dynamic parsers
 type ParseKind = symbol
 type ParseTree = ParseTreeComposite | ParseTreeAtomic<any>
@@ -352,7 +272,7 @@ abstract class Parser<P extends ParseTree> {
 		}
 	}
 }
-
+*/
 
 
 
