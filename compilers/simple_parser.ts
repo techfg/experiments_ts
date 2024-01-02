@@ -1,43 +1,5 @@
 import { Token, TokenKind } from "./simple_lexer.ts"
-
-export type TypeofValueExtended<T> =
-	T extends string ? "string" :
-	T extends number ? "number" :
-	T extends bigint ? "bigint" :
-	T extends boolean ? "boolean" :
-	T extends symbol ? "symbol" :
-	T extends Function ? "function" :
-	T extends undefined ? "undefined" :
-	T extends RegExp ? "regex" :
-	T extends Array<any> ? "array" :
-	T extends Set<any> ? "set" :
-	T extends Map<any, any> ? "map" :
-	T extends WeakSet<any> ? "weakset" :
-	T extends WeakMap<any, any> ? "weakmap" :
-	T extends WeakRef<any> ? "weakref" :
-	T extends Promise<any> ? "promise" :
-	T extends null ? "null" :
-	T extends object ? "object" : "unknown"
-
-export const typeofExtended = <T>(param: T): TypeofValueExtended<T> => {
-	let typeof_param: string = typeof param
-	if (typeof_param === "object") {
-		typeof_param =
-			param instanceof RegExp ? "regex" :
-			param instanceof Array ? "array" :
-			param instanceof Set ? "set" :
-			param instanceof Map ? "map" :
-			param instanceof WeakSet ? "weakset" :
-			param instanceof WeakMap ? "weakmap" :
-			param instanceof WeakRef ? "weakref" :
-			param instanceof Promise ? "promise" :
-			param === null ? "null" : typeof_param
-	}
-	return typeof_param as TypeofValueExtended<T>
-}
-
-const number_MAX_SAFE_INTEGER = Number.MAX_SAFE_INTEGER
-
+import { number_MAX_SAFE_INTEGER, typeofExtended } from "./utilities.ts"
 
 export type ParseKind = symbol
 
@@ -48,10 +10,6 @@ export interface ParseTree<T> {
 }
 
 export type ParseFunction<P extends ParseTree<any>> = (cursor: number, input: Token[]) => P | undefined
-
-// export interface Parser<P extends ParseTree<any>> {
-// 	parse: ParseFunction<P>
-// }
 
 interface ParserConfig_MatchToken<T extends Token> {
 	kind?: T["kind"]
@@ -206,4 +164,3 @@ export class ParserContext {
 	// TODO
 	toRailroadGraph() { }
 }
-

@@ -12,6 +12,8 @@
  * @module
 */
 
+import { array_isArray, skip_whitespace } from "./utilities.ts"
+
 /** represents the type for token kinds in the lexer. each unique token kind is represented by a distinct symbol. */
 export type TokenKind = symbol
 /** represents a control token, which is a specialized form of a token kind.
@@ -63,23 +65,6 @@ export interface NullToken extends TokenTree {
 /** a `Tokenizer` is a function, specific to a certain kind of token, which can basically tokenize an input text, starting from a specific cursor position. */
 export type Tokenizer = (cursor: number, input: string) => TokenTree
 
-const
-	whitespace_chars = [" ".charCodeAt(0), "\t".charCodeAt(0), "\n".charCodeAt(0), "\r".charCodeAt(0)],
-	/** check if the cursor is on a whitespace character. */
-	is_whitespace = (cursor: number, input_text: string): boolean => {
-		return whitespace_chars.includes(input_text.charCodeAt(cursor))
-	},
-	/* move the cursor to the next non-whitespace position. */
-	skip_whitespace = (cursor: number, input_text: string): number => {
-		while (is_whitespace(cursor, input_text)) { cursor += 1 }
-		return cursor
-	},
-	/** find the cursor position of the next whitespace character. */
-	find_next_whitespace = (cursor: number, input_text: string): number => {
-		while (!is_whitespace(cursor, input_text)) { cursor += 1 }
-		return cursor
-	}
-
 /** collect tokens at a certain depth in the token tree.
  * leaf nodes/endpoints that exist before the depth is reached, will not be collected.
  * @param node the current token tree node.
@@ -92,7 +77,7 @@ const collect_at_depth = (node: TokenTree, depth: number, collection: TokenTree[
 	// base case: if depth is 0, return the node itself wrapped around the return array
 	if (depth <= 0) { collection.push(node) }
 	// intermediate children that turn out to be leaf nodes become excluded
-	else if (Array.isArray(value)) {
+	else if (array_isArray(value)) {
 		for (const child of value) {
 			collect_at_depth(child, depth - 1, collection)
 		}

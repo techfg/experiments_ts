@@ -1,15 +1,8 @@
-const
-	isArray = Array.isArray,
-	array_delete_item = <T>(arr: Array<T>, item: T): boolean => {
-		const idx = arr.indexOf(item)
-		if (idx >= 0) {
-			arr.splice(idx, 1)
-			return true
-		}
-		return false
-	},
-	isEmpty = (arr: Array<any>) => (arr.length === 0)
+import { array_deleteItem, array_isArray, array_isEmpty } from "./utilities.ts"
 
+type ParserReturn<T> = undefined | Array<[unconsumed_input: string, output: T]>
+type Parser<T> = (input: string) => ParserReturn<T>
+type UnfailingParser<T> = (input: string) => NonNullable<ParserReturn<T>>
 
 class BST<T> {
 	private map = new Map<number, T[]>()
@@ -18,7 +11,7 @@ class BST<T> {
 
 	constructor(bst_items?: Array<[items: T | T[], precedence: number]>) {
 		this.map = new Map<number, T[]>(bst_items?.map(
-			([items, precedence]) => [precedence, isArray(items) ? items : [items]]
+			([items, precedence]) => [precedence, array_isArray(items) ? items : [items]]
 		))
 	}
 
@@ -33,8 +26,8 @@ class BST<T> {
 	delete(item: T, precedence: number): void {
 		const items_in_presedence = this.map.get(precedence)
 		if (items_in_presedence) {
-			this.dirty ||= array_delete_item(items_in_presedence, item)
-			if (isEmpty(items_in_presedence)) {
+			this.dirty ||= array_deleteItem(items_in_presedence, item)
+			if (array_isEmpty(items_in_presedence)) {
 				this.map.delete(precedence)
 			}
 		}
@@ -52,10 +45,6 @@ class BST<T> {
 		return this.items
 	}
 }
-
-type ParserReturn<T> = undefined | Array<[unconsumed_input: string, output: T]>
-type Parser<T> = (input: string) => ParserReturn<T>
-type UnfailingParser<T> = (input: string) => NonNullable<ParserReturn<T>>
 
 /** the `optional` version of a `base_parser` never fails (never returns `undefined`).
  * its purpose is to match 0 or 1 occurrences of `base_parser`.
@@ -78,7 +67,7 @@ const some = <T>(base_parser: Parser<T>): Parser<T[]> => {
 			result = base_parser(input)
 			output.push()
 
-		} while (!isEmpty(result))
+		} while (!array_isEmpty(result))
 
 
 		while (true) {
@@ -90,7 +79,7 @@ const some = <T>(base_parser: Parser<T>): Parser<T[]> => {
 
 
 abstract class Feature {
-	// static rules: BST<Feature>
+	static rules: BST<Feature>
 	static parsers: Parser<Feature>[]
 }
 
@@ -106,5 +95,3 @@ class Number extends Expression {
 
 	static parsers = []
 }
-
-
