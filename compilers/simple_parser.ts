@@ -10,6 +10,11 @@ export type TypeofValueExtended<T> =
 	T extends undefined ? "undefined" :
 	T extends RegExp ? "regex" :
 	T extends Array<any> ? "array" :
+	T extends Set<any> ? "set" :
+	T extends Map<any, any> ? "map" :
+	T extends WeakSet<any> ? "weakset" :
+	T extends WeakMap<any, any> ? "weakmap" :
+	T extends WeakRef<any> ? "weakref" :
 	T extends Promise<any> ? "promise" :
 	T extends null ? "null" :
 	T extends object ? "object" : "unknown"
@@ -19,12 +24,19 @@ export const typeofExtended = <T>(param: T): TypeofValueExtended<T> => {
 	if (typeof_param === "object") {
 		typeof_param =
 			param instanceof RegExp ? "regex" :
-				param instanceof Array ? "array" :
-					param instanceof Promise ? "promise" :
-						param === null ? "null" : typeof_param
+			param instanceof Array ? "array" :
+			param instanceof Set ? "set" :
+			param instanceof Map ? "map" :
+			param instanceof WeakSet ? "weakset" :
+			param instanceof WeakMap ? "weakmap" :
+			param instanceof WeakRef ? "weakref" :
+			param instanceof Promise ? "promise" :
+			param === null ? "null" : typeof_param
 	}
 	return typeof_param as TypeofValueExtended<T>
 }
+
+const number_MAX_SAFE_INTEGER = Number.MAX_SAFE_INTEGER
 
 
 export type ParseKind = symbol
@@ -144,13 +156,54 @@ export class ParserContext {
 		}
 	}
 
-	// TODO
-	parseZeroOrOnce() { }
+	parseMultiple(match: ParserConfig_Match, min: number = 0, max: number = number_MAX_SAFE_INTEGER): ParseFunction<any> {
+		return (cursor: number, input: Token[]) => {
+			const
+				output = { value: [] as Array<any>, cursor: cursor },
+				{ kind, pattern, keep, transform } = match,
+				input_len = input.length
+			let i = 0
+			for (; i < max && cursor < input_len; i++) {
+				let current_token = input[cursor++]
+				if (kind && (kind !== current_token.kind)) { break }
+				if (pattern) {
+					const typeof_pattern = typeofExtended(pattern)
+					if (typeof_pattern === "string") {
+						if ((pattern as string) !== current_token.value) { break }
+					} else if (typeof_pattern === "regex") {
+						if (!(pattern as RegExp).test(current_token.value)) { break }
+					} else {
+						const parsed_pattern = (typeof_pattern === "symbol" ?
+							this.parsers.get(pattern as symbol)! :
+							pattern as ParseFunction<any>
+						)(cursor - 1, input)
+						if (parsed_pattern === undefined) { break }
+						cursor = parsed_pattern.cursor
+						current_token = parsed_pattern
+					}
+				}
+				if (keep) {
+					output.value.push((transform ?? default_transform)(current_token))
+				}
+			}
+			output.cursor = cursor
+			return i >= min ? output : undefined
+		}
+	}
+
+	parseZeroOrOnce(match: ParserConfig_Match): ParseFunction<any> {
+		return this.parseMultiple(match, 0, 1)
+	}
+
+	parseZeroOrMore(match: ParserConfig_Match): ParseFunction<any> {
+		return this.parseMultiple(match, 0)
+	}
+
+	parseOnceOrMore(match: ParserConfig_Match): ParseFunction<any> {
+		return this.parseMultiple(match, 1)
+	}
 
 	// TODO
-	parseZeroOrMore() { }
-
-	// TODO
-	parseOnceOrMore() { }
+	toRailroadGraph() { }
 }
 
