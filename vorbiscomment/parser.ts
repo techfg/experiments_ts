@@ -240,8 +240,38 @@ type VorbisCommentEntry_type = {
 	// content: string
 }
 
+/** this here is the format of the decoded picture stream.
+ * the specification of the decoded stream lies here: [xiph.org](https://xiph.org/flac/format.html#metadata_block_picture).
+ * this format is encoded via base64 encoding, and then the resulting string is embedded into the ogg file as a comment proceeding "metadata_block_picture".
+ * note that in the embdded format, the stream of the base64 string may get broken in between due to {@link OggHeader_type}.
+ * the bytes occupied by these annoying in-between headers do not count towards the bytelength specified before the "metadata_block_picture" ({@link VorbisCommentEntry_type})
+*/
+interface VorbisCommentEntry_Picture_type extends VorbisCommentEntry_type {
+	/** `type: "u4b"` <br> the type of picture. must be in `range(0,21)`. */
+	cover_type: number
+	/** `type: "u4b"` <br> bytelength of `mime` string. */
+	// mime_length: number
+	/** `type: "str"` <br> dictates the mime string of the encoded picture data. */
+	mime: string
+	/** `type: "u4b"` <br> bytelength of `description` string. */
+	// description_length: number
+	/** `type: "str"` <br> description of this picture. */
+	description: string
+	/** `type: "u4b"` <br> width of picture. */
+	width: number
+	/** `type: "u4b"` <br> height of picture. */
+	height: number
+	/** `type: "u4b"` <br> color depth of picture in "bits per pixel" units. so it's "24" for RGB and "32" for RGBA images. */
+	depth: number
+	/** `type: "u4b"` <br> number of colors used for indexed images (such as ".gif"). if the image is not color indexed (which is likely), then it should be `0`. */
+	colors: number
+	/** `type: "u4b"` <br> bytelength of `data`. */
+	// data_length: number
+	/** `type: "u1[]"` <br> binary data of the image. */
+	data: Uint8Array
+}
 
 const a = new OggFile().setArgs(2)
 const b = a.decode(await Deno.readFile("./music.ogg"), 0)[0]
-console.debug(b)//[1].metadata["comment"]["entries"])
+console.debug(b)
 
