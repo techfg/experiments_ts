@@ -64,7 +64,7 @@ export const pattern_tokenizer_generator = <T extends Token = any>(kind: T["kind
 	) as TokenizerFunction<T>
 }
 
-export const patternLexer_FactoryFactory = <T extends Token = any>(
+export const patternLexer_FactoryGenerator = <T extends Token = any>(
 	kind: T["kind"] | LexerFactory,
 	pattern: string | RegExp,
 	precedence?: "end" | "start" | number | undefined,
