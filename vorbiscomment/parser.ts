@@ -1,24 +1,23 @@
-import { Decoded } from "https://deno.land/x/byte_codec_ts@v0.2.2a/deps.ts"
-import { SRecord, SPrimitive, SHeadArray, SHeadPrimitive } from "./deps.ts"
+import { SRecord, SPrimitive, SHeadArray, SHeadPrimitive, SArray, Decoded } from "./deps.ts"
 
 type HeaderTypeFlag_u1 =
 	| 0x01 // "continuation of stream". continuation of the previous packet in the logical bitstream.
 	| 0x02 // "beginning of stream". this flag must be set on the first page of every logical bitstream, and must not be set on any other page.
 	| 0x04 // "end of stream". this flag must be set on the final page of every logical bitstream, and must not be set on any other page.
 
-type OggMetaChunk_type = {
+type OggHeader_type = {
 	/** `type: "str"` <br> the magic 4_bytes associated with the ".ogg" file format. */
 	magic: string & "OggS"
 	/** `type: "u1"` <br> version of the ".ogg" specification. always `0`. */
 	version: number & 0x00
-	/** `type: "u1"` <br> we always start the file with a "beginning of stream" header type flag */
-	flag: HeaderTypeFlag_u1 & 0x02
-	/** `type: "u8"` <br> generally `0`, but may be different for different codecs */
+	/** `type: "u1"` <br> */
+	flag: HeaderTypeFlag_u1
+	/** `type: "u8"` <br> codec specific instruction */
 	granule_position: Uint8Array
 	/** `type: "u4l"` <br> */
 	serial_number: number
 	/** `type: "u4l"` <br> this is a monotonically increasing field for each logical bitstream. the first page is 0, the second 1, etc... */
-	page_number: number & 0
+	page_number: number
 	/** `type: "u4l"` <br> crc32 checksum of the data in the entire page. read specifics on wikipedia "https://en.wikipedia.org/wiki/Ogg#Metadata:~:text=has%20been%20lost.-,Checksum,-%E2%80%93%2032%20bits" */
 	checksum: number
 	/** `type: "u1"` <br> indicates the number of segments that exist in this page. it also specifies the size of the `segment_table` u1_array that follows. I think this value should always at least be `1` */
@@ -28,7 +27,27 @@ type OggMetaChunk_type = {
 	metadata: OggMetadata_type
 }
 
-class OggMetaChunk extends SRecord<OggMetaChunk_type> {
+interface OggFirstHeader_type extends OggHeader_type {
+	/** `type: "u1"` <br> we always start the file with a "beginning of stream" header type flag */
+	flag: 0x02
+	/** `type: "u8"` <br> generally `0` for the first header block */
+	granule_position: Uint8Array
+	/** `type: "u4l"` <br> the first page is 0, the second 1, etc... */
+	page_number: 0
+}
+
+interface OggLastHeader_type extends OggHeader_type {
+	/** `type: "u1"` <br> we always end the file with an "end of stream" header type flag */
+	flag: 0x04
+}
+
+class OggFile extends SArray<OggHeader> {
+	constructor() {
+		super(new OggHeader())
+	}
+}
+
+class OggHeader extends SRecord<OggHeader_type> {
 	constructor() {
 		super(
 			new SPrimitive("str", "OggS", [4]).setName("magic"),
@@ -53,15 +72,41 @@ class OggMetaChunk extends SRecord<OggMetaChunk_type> {
 	*/
 }
 
-type OggMetadata_type = OpusHead_type
+interface OggMetadata_type {
+	kind: "OpusHead" | "OpusTags"
+	[key: string]: any
+}
+
+
+class OggMetadata extends SRecord<OggMetadata_type> {
+	constructor() {
+		super(
+			new SPrimitive("str", undefined, [8]).setName("kind"),
+		)
+	}
+
+	override decode(buf: Uint8Array, offset: number): Decoded<OggMetadata_type> {
+		const
+			[{ kind }, bytesize1] = super.decode(buf, offset, 0, 1),
+			data_schema =
+				kind === "OpusHead" ? new OpusHead() :
+					kind === "OpusTags" ? new OpusTags() :
+						undefined
+		if (data_schema === undefined) {
+			throw Error("unidentified type of metadata kind (`OggMetadata.kind`): " + kind)
+		}
+		return data_schema.decode(buf, offset)
+	}
+}
+
 
 /** see the following resource for specifications:
  * [wiki.xiph.org](https://wiki.xiph.org/OggOpus#ID_Header)
  * [opus-codec.org](https://opus-codec.org/docs/opusfile_api-0.7/structOpusHead.html)
 */
-type OpusHead_type = {
+interface OpusHead_type extends OggMetadata_type {
 	/** `type: "str"` <br> the magic 8_bytes associated with the opus header block. */
-	magic: "OpusHead"
+	kind: "OpusHead"
 	/** `type: "u1"` <br> generally `1` in all modern encodings. */
 	version: 0x00 | 0x01
 	/** `type: "u1"` <br> specifies channel count, must be at least `1`. */
@@ -73,24 +118,12 @@ type OpusHead_type = {
 	/** `type: "i2l"` <br> the gain to apply to the decoded output in units of decibles (dB). */
 	output_gain: number
 	channel_table: OpusChannelTable_type
-	string1: "OggS\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"
-	/** `type: u8` */
-	bytes1: Uint8Array
-	/** `type: u4` */
-	crc1: number
-	/** `type: u1` */
-	// padding1_length: number[]
-	/** `type: u1[]` */
-	padding1: number[]
-	/** `type: "str"` <br> the magic 8_bytes associated with the opus comment block. */
-	comment_magic: "OpusTags"
-	comment: VorbisComment_type
 }
-//TODO NOTICE THE RESEMBLANCE OF THE MESTERIOUS STUFF WITH THE INITIAL HEADER UPTILL THE CRC/CHECKSUM!!
+
 class OpusHead extends SRecord<OpusHead_type> {
 	constructor() {
 		super(
-			new SPrimitive("str", "OpusHead", [8]).setName("magic"),
+			new SPrimitive("str", "OpusHead", [8]).setName("kind"),
 			new SPrimitive("u1").setName("version"),
 			new SPrimitive("u1").setName("channels"),
 			new SPrimitive("u2l").setName("pre_skip"),
@@ -98,17 +131,11 @@ class OpusHead extends SRecord<OpusHead_type> {
 			new SPrimitive("u2l").setName("output_gain"),
 			// @ts-ignore
 			new OpusChannelTable().setName("channel_table"),
-			new SPrimitive("str", "OggS\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00", [14]).setName("string1"),
-			new SPrimitive("bytes", Uint8Array.from(Array(8).fill(0)), [8]).setName("bytes1"),
-			new SPrimitive("u4l").setName("crc1"),
-			new SHeadPrimitive("u1", "u1[]").setName("padding1"),
-			new SPrimitive("str", "OpusTags", [8]).setName("comment_magic"),
-			new SHeadPrimitive("u4l", "str").setName("comment"),
+			// new SPrimitive("str", "OpusTags", [8]).setName("comment_magic"),
+			// new SHeadPrimitive("u4l", "str").setName("comment"),
 		)
 	}
 }
-
-class OggMetadata extends OpusHead { }
 
 type OpusChannelTable_type = {
 	/** `type: "u1"` <br>
@@ -157,13 +184,28 @@ class OpusChannelTable extends SRecord<OpusChannelTable_type> {
 	override decode(buf: Uint8Array, offset: number, ...args: [channels: number]): Decoded<OpusChannelTable_type> {
 		const
 			channels = args[0],
-			[{ family }, offset1] = super.decode(buf, offset, 0, 1)
-		if (family <= 0) { return [{ family }, offset1] }
+			[{ family }, bytesize1] = super.decode(buf, offset, 0, 1)
+		if (family <= 0) { return [{ family }, bytesize1] }
 		this.children[3].setArgs(channels)
-		const [rest_table, offset2] = super.decode(buf, offset1, 1)
-		return [{ ...rest_table, family }, offset2]
+		const [rest_table, bytesize2] = super.decode(buf, offset + bytesize1, 1)
+		return [{ ...rest_table, family }, bytesize2]
 	}
 
+}
+
+interface OpusTags_type extends OggMetadata_type {
+	/** `type: "str"` <br> the magic 8_bytes associated with the opus comment block. */
+	kind: "OpusTags"
+	comment: VorbisComment_type
+}
+
+class OpusTags extends SRecord<OpusTags_type> {
+	constructor() {
+		super(
+			new SPrimitive("str", "OpusTags", [8]).setName("kind"),
+			new VorbisComment().setName("comment")
+		)
+	}
 }
 
 /** see the following resource for specifications:
@@ -171,20 +213,35 @@ class OpusChannelTable extends SRecord<OpusChannelTable_type> {
  * [opus-codec.org](https://opus-codec.org/docs/opusfile_api-0.7/structOpusTags.html)
 */
 type VorbisComment_type = {
-	/** `type: "u4"` <br> indicates the bytelength of the `vendor_name` string. */
+	/** `type: "u4l"` <br> indicates the bytelength of the `vendor_name` string. */
 	// vendor_name_length: number
 	vendor_name: string
+	/** `type: "u4l"` <br> indicates the number of `entries` in the comment. */
+	// entries_length: number
+	entries: VorbisCommentEntry_type
+
+}
+
+class VorbisComment extends SRecord<VorbisComment_type> {
+	constructor() {
+		super(
+			// @ts-ignore
+			new SHeadPrimitive("u4l", "str").setName("vendor_name"),
+			new SHeadArray("u4l",
+				new SHeadPrimitive("u4l", "str")
+			).setName("entries"),
+		)
+	}
+}
+
+type VorbisCommentEntry_type = {
+	/** `type: "u4l"` <br> indicates the string length the comment entry. */
+	// length: number
+	// content: string
 }
 
 
-type VorbisCommentEntry = {
-
-}
-
-
-const a = new OggMetaChunk()
+const a = new OggFile().setArgs(2)
 const b = a.decode(await Deno.readFile("./music.ogg"), 0)[0]
-console.debug(b)
-
-
+console.debug(b)//[1].metadata["comment"]["entries"])
 
