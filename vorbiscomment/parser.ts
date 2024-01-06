@@ -1,4 +1,4 @@
-import { SRecord, SPrimitive, SHeadArray, SHeadPrimitive, SArray, Decoded } from "./deps.ts"
+import { SRecord, SPrimitive, SHeadArray, SHeadPrimitive, SArray, Decoded, sum, concatBytes, base64BodyToBytes, decode_str } from "./deps.ts"
 
 
 /** see "header_type_flag" in following resource:
@@ -72,7 +72,8 @@ type OggPage_type = {
 	 * see the following for reference: [wikipedia.org](https://en.wikipedia.org/wiki/Ogg#Page_structure:~:text=any%20one%20page.-,Segment,-table)
 	*/
 	segment_table: number[]
-	content: OggMetadata_type
+	/** size of the content is known after parsing and summing up {@link OggPage_type.segment_table | this page's segment_table} */
+	content: Uint8Array //OggMetadata_type
 }
 
 interface OggFirstPage_type extends OggPage_type {
@@ -89,9 +90,64 @@ interface OggLastPage_type extends OggPage_type {
 	flag: 0b100
 }
 
+interface Packet_type {
+	content: Uint8Array
+}
+
 class OggFile extends SArray<OggPage> {
 	constructor() {
 		super(new OggPage())
+	}
+
+	override decode(buf: Uint8Array, offset: number) {
+		const
+			output: Array<OggPage_type> = [],
+			flag_endofstream_bitmask = 0b100
+		let
+			total_bytesize = 0,
+			is_last_page = false
+		while (!is_last_page) {
+			const [oggpage, bytesize] = this.decodeNext(buf, offset + total_bytesize)
+			output.push(oggpage)
+			total_bytesize += bytesize
+			if ((oggpage.flag & flag_endofstream_bitmask) > 0) {
+				// this is the last page of this file
+				is_last_page = true
+			}
+		}
+		return [output, total_bytesize] as Decoded<Array<OggPage_type>>
+	}
+
+	static toPackets(pages: Array<OggPage_type>): Array<Packet_type> {
+		const
+			output: Array<Packet_type> = [],
+			flag_continuationofstream_bitmask = 0b001
+		for (const { flag, segment_table, content } of pages) {
+			const packet_bytesizes = segment_table.reduce((packet_bytesizes, segment_bytelength) => {
+				if (segment_bytelength < 255) { packet_bytesizes.push(segment_bytelength) }
+				else {
+					const prev_packet_bytesize = (packet_bytesizes.pop() ?? 0) + segment_bytelength
+					packet_bytesizes.push(prev_packet_bytesize)
+				}
+				return packet_bytesizes
+			}, [] as number[])
+			let segment_offset = 0
+			const packets_in_page: Array<Packet_type> = packet_bytesizes.map((packet_bytesize) => {
+				const packet_content = content.slice(segment_offset, segment_offset + packet_bytesize)
+				segment_offset += packet_bytesize
+				return { content: packet_content }
+			})
+			if ((flag & flag_continuationofstream_bitmask) > 0) {
+				// this is page is a continuation of the previous one. thus the first packet contents must be merged with the previous partial packet
+				const
+					prev_partial_packet = output.pop()!,
+					continuation_of_partial_packet = packets_in_page.shift()!
+				prev_partial_packet.content = concatBytes(prev_partial_packet.content, continuation_of_partial_packet.content)
+				output.push(prev_partial_packet)
+			}
+			output.push(...packets_in_page)
+		}
+		return output
 	}
 }
 
@@ -105,9 +161,18 @@ class OggPage extends SRecord<OggPage_type> {
 			new SPrimitive("u4l").setName("serial_number"),
 			new SPrimitive("u4l").setName("page_number"),
 			new SPrimitive("u4l").setName("checksum"),
-			new SHeadArray("u1", new SPrimitive("u1")).setName("segment_table"),
-			new OggMetadata().setName("content"),
+			new SHeadPrimitive<"u1", number[], "u1[]">("u1", "u1[]").setName("segment_table"),
+			new SPrimitive("bytes").setName("content"),
+			// new OggMetadata().setName("content"),
 		)
+	}
+	override decode(buf: Uint8Array, offset: number) {
+		const
+			[partial1, bytesize1] = super.decode(buf, offset, 0, 8),
+			content_bytesize = sum(partial1.segment_table)
+		this.children[8].setArgs(content_bytesize)
+		const [partial2, bytesize2] = super.decode(buf, offset + bytesize1, 8)
+		return [{ ...partial1, ...partial2 }, bytesize1 + bytesize2] as Decoded<OggPage_type>
 	}
 }
 
@@ -129,8 +194,8 @@ class OggMetadata extends SRecord<OggMetadata_type> {
 			[{ kind }, bytesize1] = super.decode(buf, offset, 0, 1),
 			data_schema =
 				kind === "OpusHead" ? new OpusHead() :
-				kind === "OpusTags" ? new OpusTags() :
-					undefined
+					kind === "OpusTags" ? new OpusTags() :
+						undefined
 		if (data_schema === undefined) {
 			throw Error("unidentified type of metadata kind (`OggMetadata.kind`): " + kind)
 		}
@@ -254,14 +319,14 @@ type VorbisComment_type = {
 	vendor_name: string
 	/** `type: "u4l"` <br> indicates the number of `entries` in the comment. */
 	// entries_length: number
-	entries: VorbisCommentEntry_type
+	entries: VorbisCommentEntry_type[]
 
 }
 
 class VorbisComment extends SRecord<VorbisComment_type> {
 	constructor() {
 		super(
-			new SHeadPrimitive("u4l", "str").setName("vendor_name"),
+			new SHeadPrimitive("u4l", "str").setName("vendor_name") as any,
 			new SHeadArray("u4l",
 				new SHeadPrimitive("u4l", "str")
 			).setName("entries"),
@@ -306,7 +371,33 @@ interface VorbisCommentEntry_Picture_type extends VorbisCommentEntry_type {
 	data: Uint8Array
 }
 
-const a = new OggFile().setArgs(2)
+class VorbisCommentEntry_Picture extends SRecord<VorbisCommentEntry_Picture_type> {
+	constructor() {
+		super(
+			new SPrimitive("u4b").setName("cover_type"),
+			new SHeadPrimitive("u4b", "str").setName("mime") as any,
+			new SHeadPrimitive("u4b", "str").setName("description") as any,
+			new SPrimitive("u4b").setName("width"),
+			new SPrimitive("u4b").setName("height"),
+			new SPrimitive("u4b").setName("depth"),
+			new SPrimitive("u4b").setName("colors"),
+			new SHeadPrimitive("u4b", "bytes").setName("data") as any,
+		)
+	}
+}
+
+const a = new OggFile()
 const b = a.decode(await Deno.readFile("./music.ogg"), 0)[0]
-console.debug(b)
+const oggpackets = OggFile.toPackets(b)
+// console.debug(OggFile.toPackets(b)) //.filter((v) => { return v.content.length < 4080 }))
+const c = new OpusHead().decode(oggpackets[0].content, 0)[0]
+const d = new OpusTags().decode(oggpackets[1].content, 0)[0]
+console.log(c)
+console.log(d)
+const metadata_block_picture = base64BodyToBytes((d.comment.entries[2] as string).split("=", 2)[1])
+const e = new VorbisCommentEntry_Picture().decode(metadata_block_picture, 0)[0]
+console.log(e)
+// console.log(decode_str(e.data, 0))
+await Deno.writeFile("./image.png", e.data)
+
 
