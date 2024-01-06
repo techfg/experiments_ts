@@ -1,11 +1,35 @@
 import { SRecord, SPrimitive, SHeadArray, SHeadPrimitive, SArray, Decoded } from "./deps.ts"
 
-type HeaderTypeFlag_u1 =
-	| 0x01 // "continuation of stream". continuation of the previous packet in the logical bitstream.
-	| 0x02 // "beginning of stream". this flag must be set on the first page of every logical bitstream, and must not be set on any other page.
-	| 0x04 // "end of stream". this flag must be set on the final page of every logical bitstream, and must not be set on any other page.
 
-type OggHeader_type = {
+/** see "header_type_flag" in following resource:
+ * - [xiph.org](https://www.xiph.org/ogg/doc/framing.html#page_header)
+ * there are three bitflags, lets say [z, y, x], presented as 0bzyx.
+ * each bitflag carries the following meaning when either set (`true`) or unset (`false`):
+ * - `x`: "continuation of stream"
+ *    - `x == 1`: a continuation of the previous packet in the logical bitstream.
+ *    - `x == 0`: a fresh packet.
+ * - `y`: "beginning of stream" this flag must be set on the first page of every logical bitstream, and must not be set on any other page.
+ *    - `y == 1`: this is the first page of a logical bitstream.
+ *    - `y == 0`: not first page of logical bitstream.
+ * - `z`: "end of stream". this flag must be set on the final page of every logical bitstream, and must not be set on any other page.
+ *    - `z == 1`: this is the last page of logical bitstream.
+ *    - `z == 0`: not last page of logical bitstream.
+*/
+type HeaderTypeFlag_u1 =
+	| 0b000
+	| 0b001
+	| 0b010
+	| 0b011
+	| 0b100
+	| 0b101
+	| 0b110
+	| 0b111
+
+/** see the following resource for specifications:
+ * - [wiki.xiph.org](https://wiki.xiph.org/Ogg#Ogg_page_format)
+ * - [xiph.org](https://www.xiph.org/ogg/doc/framing.html#page_header)
+*/
+type OggPage_type = {
 	/** `type: "str"` <br> the magic 4_bytes associated with the ".ogg" file format. */
 	magic: string & "OggS"
 	/** `type: "u1"` <br> version of the ".ogg" specification. always `0`. */
@@ -22,32 +46,56 @@ type OggHeader_type = {
 	checksum: number
 	/** `type: "u1"` <br> indicates the number of segments that exist in this page. it also specifies the size of the `segment_table` u1_array that follows. I think this value should always at least be `1` */
 	// segment_table_length: number
-	/** `type: "u1[]"` <br> an array of 8-bit values, each indicating the bytelength of the corresponding segment within the page body. this means that each segment can be a maximum of 255_bytes. */
+	/** `type: "u1[]"` <br> an array of 8-bit values, each indicating the bytelength of the corresponding segments within the current page body.
+	 * the values within this array determine the total bytelength of the data segments proceeding.
+	 * if a certain segment is said to be of bytelength in `range(0, 255)`, then that packet will end after that many bytes, and the next packet will then begin after it.
+	 * if a certain segment is said to be of bytelength `255`, then the segment following it should be a part of the current packet.
+	 * if the last segment (last item in the array) has a bytelength of `255`, then it indicates that the last packet continues over to the next page, and so the next page's {@link OggPage_type.flag} will be `0b001` to indicate continuation.
+	 * 
+	 * - example 1: if `segment_table = [255, 255, 255, 70]`:
+	 *    - then it would mean that there is one packet in this page.
+	 *    - the total bytes carried in this page is: `255 + 255 + 255 + 70 = 835`, and also equals the packet's bytelength.
+	 *    - after `835` bytes, you will encounter the next new fresh page ({@link OggPage_type}), starting with its magic signature "OggS".
+	 * - example 2: if `segment_table = [255, 35, 255, 70]`:
+	 *    - then it would mean that there are two packets in this page.
+	 *      - the first carries `255 + 35 = 290` bytes, and is complete.
+	 *      - the second carries `255 + 70 = 325` bytes, and is complete.
+	 *    - the total bytes carried in this page is: `255 + 35 + 255 + 70 = 615`.
+	 *    - after `615` bytes, you will encounter the next new fresh page ({@link OggPage_type}), starting with its magic signature "OggS".
+	 * - example 3: if `segment_table = [255, 35, 255, 255]`:
+	 *    - then it would mean that there are two packets in this page.
+	 *      - the first carries `255 + 35 = 290` bytes, and is complete.
+	 *      - the second carries `255 + 255 = 510` bytes, but is incomplete and will be carried over to the next page.
+	 *    - the total bytes carried in this page is: `255 + 35 + 255 + 255 = 800`.
+	 *    - after `800` bytes, you will encounter the next continuation page ({@link OggPage_type}). this time, the next page's {@link OggPage_type.flag} will be `0b001` to indicate continuation.
+	 * 
+	 * see the following for reference: [wikipedia.org](https://en.wikipedia.org/wiki/Ogg#Page_structure:~:text=any%20one%20page.-,Segment,-table)
+	*/
 	segment_table: number[]
-	metadata: OggMetadata_type
+	content: OggMetadata_type
 }
 
-interface OggFirstHeader_type extends OggHeader_type {
-	/** `type: "u1"` <br> we always start the file with a "beginning of stream" header type flag */
-	flag: 0x02
-	/** `type: "u8"` <br> generally `0` for the first header block */
+interface OggFirstPage_type extends OggPage_type {
+	/** `type: "u1"` <br> we always start the file with a "beginning of stream" page type flag */
+	flag: 0b010
+	/** `type: "u8"` <br> generally `0` for the first page block */
 	granule_position: Uint8Array
 	/** `type: "u4l"` <br> the first page is 0, the second 1, etc... */
 	page_number: 0
 }
 
-interface OggLastHeader_type extends OggHeader_type {
-	/** `type: "u1"` <br> we always end the file with an "end of stream" header type flag */
-	flag: 0x04
+interface OggLastPage_type extends OggPage_type {
+	/** `type: "u1"` <br> we always end the file with an "end of stream" page type flag */
+	flag: 0b100
 }
 
-class OggFile extends SArray<OggHeader> {
+class OggFile extends SArray<OggPage> {
 	constructor() {
-		super(new OggHeader())
+		super(new OggPage())
 	}
 }
 
-class OggHeader extends SRecord<OggHeader_type> {
+class OggPage extends SRecord<OggPage_type> {
 	constructor() {
 		super(
 			new SPrimitive("str", "OggS", [4]).setName("magic"),
@@ -58,18 +106,9 @@ class OggHeader extends SRecord<OggHeader_type> {
 			new SPrimitive("u4l").setName("page_number"),
 			new SPrimitive("u4l").setName("checksum"),
 			new SHeadArray("u1", new SPrimitive("u1")).setName("segment_table"),
-			new OggMetadata().setName("metadata"),
+			new OggMetadata().setName("content"),
 		)
 	}
-
-	/*
-	override decode(buf: Uint8Array, offset: number) {
-		const [chunk_a, bytesize_a] = super.decode(buf, offset, 0, 2)
-		this.children[2].setArgs(chunk_a["chunk_length"])
-		const [chunk_b, bytesize_b] = super.decode(buf, offset + bytesize_a, 2)
-		return [{ ...chunk_a, ...chunk_b }, bytesize_a + bytesize_b] as [value: png_chunk_type, bytesize: number]
-	}
-	*/
 }
 
 interface OggMetadata_type {
@@ -90,8 +129,8 @@ class OggMetadata extends SRecord<OggMetadata_type> {
 			[{ kind }, bytesize1] = super.decode(buf, offset, 0, 1),
 			data_schema =
 				kind === "OpusHead" ? new OpusHead() :
-					kind === "OpusTags" ? new OpusTags() :
-						undefined
+				kind === "OpusTags" ? new OpusTags() :
+					undefined
 		if (data_schema === undefined) {
 			throw Error("unidentified type of metadata kind (`OggMetadata.kind`): " + kind)
 		}
@@ -129,10 +168,7 @@ class OpusHead extends SRecord<OpusHead_type> {
 			new SPrimitive("u2l").setName("pre_skip"),
 			new SPrimitive("u4l").setName("sample_rate"),
 			new SPrimitive("u2l").setName("output_gain"),
-			// @ts-ignore
-			new OpusChannelTable().setName("channel_table"),
-			// new SPrimitive("str", "OpusTags", [8]).setName("comment_magic"),
-			// new SHeadPrimitive("u4l", "str").setName("comment"),
+			new OpusChannelTable().setName("channel_table") as any,
 		)
 	}
 }
@@ -225,7 +261,6 @@ type VorbisComment_type = {
 class VorbisComment extends SRecord<VorbisComment_type> {
 	constructor() {
 		super(
-			// @ts-ignore
 			new SHeadPrimitive("u4l", "str").setName("vendor_name"),
 			new SHeadArray("u4l",
 				new SHeadPrimitive("u4l", "str")
@@ -243,7 +278,7 @@ type VorbisCommentEntry_type = {
 /** this here is the format of the decoded picture stream.
  * the specification of the decoded stream lies here: [xiph.org](https://xiph.org/flac/format.html#metadata_block_picture).
  * this format is encoded via base64 encoding, and then the resulting string is embedded into the ogg file as a comment proceeding "metadata_block_picture".
- * note that in the embdded format, the stream of the base64 string may get broken in between due to {@link OggHeader_type}.
+ * note that in the embdded format, the stream of the base64 string may get broken in between due to {@link OggPage_type}.
  * the bytes occupied by these annoying in-between headers do not count towards the bytelength specified before the "metadata_block_picture" ({@link VorbisCommentEntry_type})
 */
 interface VorbisCommentEntry_Picture_type extends VorbisCommentEntry_type {
