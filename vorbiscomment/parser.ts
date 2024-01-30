@@ -398,6 +398,7 @@ const metadata_block_picture = base64BodyToBytes((d.comment.entries[2] as string
 const e = new VorbisCommentEntry_Picture().decode(metadata_block_picture, 0)[0]
 console.log(e)
 // console.log(decode_str(e.data, 0))
-await Deno.writeFile("./image.png", e.data)
-
+// await Deno.writeFile("./image.png", e.data)
+const heads = oggpackets.map((pk) => { return pk.content }).filter((content) => content.length < 6)
+console.debug(heads)
 
