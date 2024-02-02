@@ -88,7 +88,9 @@ interface HOTKindMap<A> {
 	/** identity type */
 	"none": A
 	/**  */
-	"MyMap": FN1<A>
+	"BinaryPureStep_Of": BinaryPureStep<A>
+	// TODO: the following is not used. delete it later
+	"ArgsOf_BinaryPureStep": A extends BinaryPureStep<any, infer ARGS> ? ARGS : never
 }
 
 /** get a certain _higher-order-type_ (HOT) by referencing it through its alias, and pairing it with the data/type it is supposed to operate on. */
@@ -201,12 +203,32 @@ export abstract class BinaryLengthedDataStep<OUT, LOST = any> extends BinaryStep
 export abstract class BinaryLengthedDataPureStep<OUT> extends BinaryPureStep<OUT, LengthedArgs> implements BinaryLengthedDataStep<OUT, never> { }
 
 
+export type ObjectToEntries_Mapped<OBJ, HOTAlias extends keyof HOTKindMap<any> = "none"> = {
+	[K in keyof OBJ as number]: [K, ApplyHOT<HOTAlias, OBJ[K]>]
+}[number]
 
+export type Entry_Mapped<ENTRY_TYPE extends [string, any], HOTAlias extends keyof HOTKindMap<any> = "none"> = [ENTRY_TYPE[0], ApplyHOT<HOTAlias, ENTRY_TYPE[1]>]
+
+// export type Entries_Mapped1<ENTRIES extends Array<[string, any]>> = {
+// 	[K in EntriesToKeys<ENTRIES> as number]: [K, Extract<ENTRIES[number], [K, any]>[1]]
+// }[number]
+
+// export type Entries_Mapped2<ENTRIES extends Array<[string, any]>, HOTAlias extends keyof HOTKindMap<any> = "none"> = {
+// 	[N in keyof ENTRIES]: Entry_Mapped<ENTRIES[N], HOTAlias>
+// }
+
+export type Entries_Mapped<
+	ENTRIES extends Array<[string, any]>,
+	HOTAlias extends keyof HOTKindMap<any> = "none",
+	OBJ extends ObjectFromEntries<ENTRIES> = ObjectFromEntries<ENTRIES>
+> = ObjectToEntries_Mapped<OBJ, HOTAlias>
 
 /*
-export type ObjectToEntries_Mapped_FN1<OBJ> = {
-	[K in keyof OBJ as number]: [K, FN1<OBJ[K]>]
+
+export type Entries_Mapped<ENTRIES extends Array<[string, any]>, HOTAlias extends keyof HOTKindMap<any> = "none"> = {
+	[K in keyof ENTRIES as number]: [K, ApplyHOT<HOTAlias, ENTRIES[K][1]>]
 }[number]
+
 
 // Define the ObjectToMappedEntries type
 type ObjectToMappedEntries<OBJ, HOTAlias extends keyof HOTKindMap<any> = "none"> = {

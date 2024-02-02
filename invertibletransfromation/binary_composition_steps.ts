@@ -1,5 +1,5 @@
 import { COMPILATION_MODE, compilation_mode, concatBytes } from "./deps.ts"
-import { BinaryInput, BinaryOutput, BinaryPureStep, LengthedArgs, OptionalNeverKeys } from "./typedefs.ts"
+import { BinaryInput, BinaryOutput, BinaryPureStep, LengthedArgs, ObjectToEntries_Mapped, OptionalNeverKeys } from "./typedefs.ts"
 
 
 export interface ArrayArgs<ITEM_ARGS> extends LengthedArgs {
@@ -95,8 +95,12 @@ export class BinaryHeaderLengthedStep<
 			{ bin, pos, args: { head: head_args, body: body_args } = {} } = input,
 			head_step = this.head_step,
 			body_step = this.body_step,
-			{ val: length, len: head_bytelength } = head_step.forward({ bin, pos, args: head_args })
-		return body_step.forward({ bin, pos: pos + head_bytelength, args: { length, ...body_args } })
+			{ val: length, len: head_bytelength } = head_step.forward({ bin, pos, args: head_args }),
+			{ val, len: body_bytelength } = body_step.forward({ bin, pos: pos + head_bytelength, args: { length, ...body_args } })
+		return {
+			val,
+			len: head_bytelength + body_bytelength,
+		}
 	}
 	backward(input: Omit<BinaryOutput<BODY_STEP extends BinaryPureStep<infer T, BODY_ARGS> ? T : never>, "len">): BinaryInput<OptionalNeverKeys<HeaderLengthedArgs<HEAD_ARGS, BODY_ARGS>>> {
 		const
@@ -115,34 +119,60 @@ export class BinaryHeaderLengthedStep<
 }
 
 
-/*
-interface RecordArgs<RECORD_ARGS_MAP extends { [key: string]: any }> {
+export interface RecordArgs<RECORD_ARGS_MAP extends { [key: string]: any }> {
 	entry_args: RECORD_ARGS_MAP
 }
+type RecordEntry_KeyStepTuple<RECORD> = ObjectToEntries_Mapped<RECORD, "BinaryPureStep_Of">
+// TODO: cleanup the line below, as inference of RECORD entries' ARGS will probably not be implemented
+// type RecordEntry_KeyArgsTuple<RecordEntryBinaryStep extends [name: string, step: BinaryPureStep<any>]> = Entries_Mapped<Array<RecordEntryBinaryStep>, "ArgsOf_BinaryPureStep">
 
-interface RecordEntry<RECORD_STEP_MAP extends { [key: string]: BinaryPureStep<any> }, K extends keyof RECORD_STEP_MAP> {
+export class BinaryRecordStep<
+	RECORD,
+	// TODO: ARGS is extremely difficult to model with a provided set of `entries`. therefore, it is better to have to user fill it out manually
+	// if we were to somehow be able to infer the args from `entries: Array<ENTRY_TYPE>`, then the `ARGS` typeparam will have to move down to become the last generic typeparameter.
+	// alternatively, we may actually narrow down `ENTRY_TYPE` based on what our `ARGS` is set to be. but I think that's a stretch, and will make the typescript LSP even slower while inferring
+	ENTRY_ARGS extends { [K in keyof RECORD]?: any } = { [K in keyof RECORD]?: any },
+	ENTRY_TYPE extends RecordEntry_KeyStepTuple<RECORD> = RecordEntry_KeyStepTuple<RECORD>,
+> extends BinaryPureStep<RECORD, RecordArgs<ENTRY_ARGS>> {
+	// protected readonly entry_steps: ObjectFromEntries<Array<ENTRY_TYPE & [string, unknown]>>
+	protected readonly entry_steps: Array<ENTRY_TYPE>
+	protected lost!: never
 
-}
-class BinaryRecordStep<
-	RECORD
-> extends BinaryPureStep<RECORD> {
-
-}
-*/
-
-/*
-type Z = ObjectFromEntries
-
-type Schemaaa = {
-	a: number
-	b: Map<any, any>
-	c?: string
-	d: {
-		kill: string
-		your: { self: Uint8Array }
+	constructor(entries: Array<ENTRY_TYPE>) {
+		super()
+		this.entry_steps = entries
+	}
+	forward(input: BinaryInput<RecordArgs<ENTRY_ARGS>>): BinaryOutput<RECORD> {
+		const
+			{ bin, pos, args: { entry_args = {} as ENTRY_ARGS } = {} } = input,
+			steps = this.entry_steps as unknown as Array<[key: keyof RECORD, step: BinaryPureStep<any, any>]>,
+			out_record = {} as RECORD
+		let bytelength = 0
+		for (const [key, step] of steps) {
+			const { val, len } = step.forward({ bin, pos: pos + bytelength, args: entry_args[key] })
+			bytelength += len
+			out_record[key] = val
+		}
+		return {
+			val: out_record,
+			len: bytelength,
+		}
+	}
+	backward(input: Omit<BinaryOutput<RECORD>, "len">): BinaryInput<RecordArgs<ENTRY_ARGS>> {
+		const
+			steps = this.entry_steps as unknown as Array<[key: keyof RECORD, step: BinaryPureStep<any, any>]>,
+			out_bins: Uint8Array[] = [],
+			val = input.val,
+			entry_args = {} as ENTRY_ARGS
+		for (const [key, step] of steps) {
+			const { bin, args } = step.backward({ val: val[key] })
+			entry_args[key] = args
+			out_bins.push(bin)
+		}
+		return {
+			bin: concatBytes(...out_bins),
+			pos: 0,
+			args: { entry_args }
+		}
 	}
 }
-type R = RecordArgs<Schemaaa>
-declare const r: R
-const www = r.entry_args.d
-*/
