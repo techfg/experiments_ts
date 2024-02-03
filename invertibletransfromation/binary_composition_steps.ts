@@ -3,7 +3,7 @@ import { BinaryInput, BinaryOutput, BinaryPureStep, LengthedArgs, ObjectToEntrie
 
 
 export interface ArrayArgs<ITEM_ARGS> extends LengthedArgs {
-	item_args: ITEM_ARGS
+	item: ITEM_ARGS
 }
 export class BinaryArrayStep<
 	ITEM_STEP extends BinaryPureStep<any, any>,
@@ -18,7 +18,7 @@ export class BinaryArrayStep<
 	}
 	forward(input: BinaryInput<ArrayArgs<ITEM_ARGS>>): BinaryOutput<OUT_ITEM[]> {
 		const
-			{ bin, pos, args: { length, item_args } } = input,
+			{ bin, pos, args: { length, item } } = input,
 			item_step = this.item_step,
 			out_arr: OUT_ITEM[] = []
 		let bytelength = 0
@@ -26,7 +26,7 @@ export class BinaryArrayStep<
 			const { val, len } = item_step.forward({
 				bin,
 				pos: pos + bytelength,
-				args: item_args
+				args: item
 			})
 			bytelength += len
 			out_arr.push(val)
@@ -61,7 +61,7 @@ export class BinaryArrayStep<
 			pos: 0,
 			args: {
 				length: out_bins.length,
-				item_args: item_args!
+				item: item_args!
 			}
 		}
 	}
@@ -119,9 +119,7 @@ export class BinaryHeaderLengthedStep<
 }
 
 
-export interface RecordArgs<RECORD_ARGS_MAP extends { [key: string]: any }> {
-	entry_args: RECORD_ARGS_MAP
-}
+export type RecordArgs<RECORD_ARGS_MAP extends { [key: string]: any }> = RECORD_ARGS_MAP
 type RecordEntry_KeyStepTuple<RECORD> = ObjectToEntries_Mapped<RECORD, "BinaryPureStep_Of">
 // TODO: cleanup the line below, as inference of RECORD entries' ARGS will probably not be implemented
 // type RecordEntry_KeyArgsTuple<RecordEntryBinaryStep extends [name: string, step: BinaryPureStep<any>]> = Entries_Mapped<Array<RecordEntryBinaryStep>, "ArgsOf_BinaryPureStep">
@@ -144,12 +142,12 @@ export class BinaryRecordStep<
 	}
 	forward(input: BinaryInput<RecordArgs<ENTRY_ARGS>>): BinaryOutput<RECORD> {
 		const
-			{ bin, pos, args: { entry_args = {} as ENTRY_ARGS } = {} } = input,
+			{ bin, pos, args = {} as ENTRY_ARGS } = input,
 			steps = this.entry_steps as unknown as Array<[key: keyof RECORD, step: BinaryPureStep<any, any>]>,
 			out_record = {} as RECORD
 		let bytelength = 0
 		for (const [key, step] of steps) {
-			const { val, len } = step.forward({ bin, pos: pos + bytelength, args: entry_args[key] })
+			const { val, len } = step.forward({ bin, pos: pos + bytelength, args: args[key] })
 			bytelength += len
 			out_record[key] = val
 		}
@@ -172,7 +170,7 @@ export class BinaryRecordStep<
 		return {
 			bin: concatBytes(...out_bins),
 			pos: 0,
-			args: { entry_args }
+			args: entry_args,
 		}
 	}
 }

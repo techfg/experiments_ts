@@ -4,16 +4,17 @@ import { LengthedArgs } from "./typedefs.ts"
 
 
 // TODO: document each and every binary step out there
-// TODO: implement "bytes" primitive binary step (i.e `BinaryPureStep<Uint8Array, LengthedArgs>`)
+// DONE: implement "bytes" primitive binary step (i.e `BinaryPureStep<Uint8Array, LengthedArgs>`)
 // TODO: start thinking about conditional binary steps, such as the ENUM-bytes conditional one
 // TODO: consider renaming `BinaryRecordStep` to `BinaryInterfaceStep` or `BinarySchemaStep`, as the word "Record" would imply something like a dictionary, where both the keys and values are encoded in binary.
-// TODO: consider changing `BinaryRecordStep`'s generic signature from `<RECORD_SCHEMA, ARGS, ENTRY_TYPE>` to `<ENTRIES, ARGS, RECORD_SCHEMA>`, where `RECORD_SCHEMA` would be generated through type manipulation of `ENTRIES`, and so will `ARGS`.
+// NOTPLANNED, turned out to be a bad idea. code inference with schema as first argument is far better than what was suggested here:
+//       consider changing `BinaryRecordStep`'s generic signature from `<RECORD_SCHEMA, ARGS, ENTRY_TYPE>` to `<ENTRIES, ARGS, RECORD_SCHEMA>`, where `RECORD_SCHEMA` would be generated through type manipulation of `ENTRIES`, and so will `ARGS`.
 //       but if someone would like to go with a certain schema, irrespective of the entries and args types, they'd declare `<any, any, MYSCHEMA>`
-// TODO: consider removing `BinaryRecordStep`'s `args.entry_args`, so that it is at the top level. this will actually make your design more compatible/consistent with `BinaryArrayStep` and `BinaryHeaderLengthedStep`,
+// DONE: consider removing `BinaryRecordStep`'s `args.entry_args`, so that it is at the top level. this will actually make your design more compatible/consistent with `BinaryArrayStep` and `BinaryHeaderLengthedStep`,
 //       as they too use a single nestedness for their composition components, rather than a nestedness of two, the way it currently is with `BinaryRecordStep`'s args interface.
 
 const c = new BinaryArrayStep(new BinaryNumberArrayStep("u1"))
-const c_out = c.forward({ bin: Uint8Array.of(1, 2, 3, 4, 5, 6, 7, 8, 9, 10), pos: 0, args: { length: 5, item_args: { length: 2 } } })
+const c_out = c.forward({ bin: Uint8Array.of(1, 2, 3, 4, 5, 6, 7, 8, 9, 10), pos: 0, args: { length: 5, item: { length: 2 } } })
 const c_in = c.backward(c_out)
 console.log(c_out)
 console.log(c_in)
@@ -84,21 +85,16 @@ MySchemaCodec.forward({
 	bin: my_data_binaried.bin,
 	pos: 0,
 	args: {
-		entry_args: {
-			b: { entry_args: {} },
-			c: { length: 11 },
-			d: {
-				entry_args: {
-					your: {
-						entry_args: {
-							self: {
-								body: {}
-							}
-						}
-					},
-					headless: { length: 5, item_args: {} }
+		b: {},
+		c: { length: 11 },
+		d: {
+			your: {
+				self: {
+					body: {}
 				}
-			}
+
+			},
+			headless: { length: 5, item: {} }
 		}
 	}
 })
