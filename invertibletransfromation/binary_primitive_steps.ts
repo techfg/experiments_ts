@@ -1,4 +1,4 @@
-import { NumericArrayType, NumericType, decode_cstr, decode_number, decode_number_array, decode_str, encode_cstr, encode_number, encode_number_array, encode_str } from "./deps.ts"
+import { NumericArrayType, NumericType, decode_bytes, decode_cstr, decode_number, decode_number_array, decode_str, encode_bytes, encode_cstr, encode_number, encode_number_array, encode_str } from "./deps.ts"
 import { BinaryInput, BinaryLengthedDataPureStep, BinaryOutput, BinaryPureStep, LengthedArgs } from "./typedefs.ts"
 
 
@@ -42,15 +42,15 @@ export class BinaryStringStep extends BinaryLengthedDataPureStep<string> {
 	protected lost!: never
 	forward(input: BinaryInput<LengthedArgs>): BinaryOutput<string> {
 		const
-			{ bin, pos, args: { length: str_lenth } } = input,
-			[str, bytelength] = decode_str(bin, pos, str_lenth)
+			{ bin, pos, args: { length: str_length } } = input,
+			[str, bytelength] = decode_str(bin, pos, str_length)
 		return { val: str, len: bytelength }
 	}
 	backward(input: Omit<BinaryOutput<string>, "len">): BinaryInput<LengthedArgs> {
 		const
 			bin = encode_str(input.val),
-			str_lenth = bin.length
-		return { bin, pos: 0, args: { length: str_lenth } }
+			str_length = bin.length
+		return { bin, pos: 0, args: { length: str_length } }
 	}
 }
 
@@ -75,5 +75,22 @@ export class BinaryNumberArrayStep<ENCODING extends NumericType> extends BinaryL
 			arr_len = val.length,
 			bin = encode_number_array(val, this.kind + "[]" as NumericArrayType)
 		return { bin, pos: 0, args: { length: arr_len } }
+	}
+}
+
+
+export class BinaryBytesStep extends BinaryLengthedDataPureStep<Uint8Array> {
+	protected lost!: never
+	forward(input: BinaryInput<LengthedArgs>): BinaryOutput<Uint8Array> {
+		const
+			{ bin, pos, args: { length: bytes_length } } = input,
+			[bytes, bytelength] = decode_bytes(bin, pos, bytes_length)
+		return { val: bytes, len: bytelength }
+	}
+	backward(input: Omit<BinaryOutput<Uint8Array>, "len">): BinaryInput<LengthedArgs> {
+		const
+			bin = encode_bytes(input.val),
+			length = bin.length
+		return { bin, pos: 0, args: { length } }
 	}
 }

@@ -2,7 +2,7 @@
  * it allows the incremental addition of tokenization rules and supports features like inlining, repetitions, and regex pattern matching for atomic tokens.
  * 
  * TODO:
- * - add dedicated feature for repititions so that we don't get an N-nested token tree for an N-repitition of a certain token
+ * - add dedicated feature for repetitions so that we don't get an N-nested token tree for an N-repetition of a certain token
  * - add `precedence === 0` implying auto placement of match rule based on the composite rule's array size (longest ones come first, shortest come later, atomic literals come last)
  * - [DONE but needs documentation on caveats] add regex pattern matching for atomic tokens. this will let you to define identifiers, string-literals, numbers, comments, and multi-line comments
  * - [DONE but not tested yet] add regex pattern matching for composite tokens.
@@ -54,7 +54,7 @@ export interface AtomicToken extends TokenTree {
 }
 
 /** if a `Tokenizer` should fail at matching the input, it should return a `NullToken`, with its `cursor` property dictating how far the cursor had reached before failing all possible match patterns.
- * note that it will be up to the caller of the `Tokenizer` function (which could be recursive as well) to decide what to do with the return `cursor` position propoerty of a possible `NullToken`.
+ * note that it will be up to the caller of the `Tokenizer` function (which could be recursive as well) to decide what to do with the return `cursor` position property of a possible `NullToken`.
  * but generally it will be ignored because the caller will probably want to call other remaining `Tokenizer` functions that may match the input, should the first `Tokenizer` return a `NullToken`.
 */
 export interface NullToken extends TokenTree {
@@ -203,7 +203,7 @@ export class Lexer {
 
 	/** match a rule for a given token kind.
 	 * @param kind the kind of token to match.
-	 * @param cursor the current cursor position. use `0` for starting from the begining.
+	 * @param cursor the current cursor position. use `0` for starting from the beginning.
 	 * @param input the input text being tokenized.
 	 * @returns the matched token, or a {@link NullToken | null token} if no match is found.
 	*/

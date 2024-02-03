@@ -75,7 +75,7 @@ lex.addRule(statement_token_kind, [breakfast_token_kind, ";"])
 
 
 // we always begin matching after skipping any whitespace between the previous token and the current token being scanned.
-// therefore including `^` in the begining of the regex pattern would give far better performance as it will not look for far away possible matches which do not interest us,
+// therefore including `^` in the beginning of the regex pattern would give far better performance as it will not look for far away possible matches which do not interest us,
 // as we will just drop any matches that do not begin from where the cursor left off (i.e. any resulting `regex.exec(input.substring(cursor)).index > 0` will always be dropped)
 lex.addRule(comment_token_kind, new RegExp("^\\/\\/.*"))
 lex.addRule(statement_token_kind, [comment_token_kind], 1)

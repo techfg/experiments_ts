@@ -68,10 +68,10 @@ export const patternLexer_FactoryGenerator = <T extends Token = any>(
 	kind: T["kind"] | LexerFactory,
 	pattern: string | RegExp,
 	precedence?: "end" | "start" | number | undefined,
-	import_preceeding_factories: Array<LexerFactory> = [],
+	import_preceding_factories: Array<LexerFactory> = [],
 ): LexerFactory<T> => {
 	return (ctx: LexerContext) => {
-		for (const lexer_factory of import_preceeding_factories) {
+		for (const lexer_factory of import_preceding_factories) {
 			ctx.getLexer(lexer_factory)
 		}
 		kind = typeof kind === "function" ?

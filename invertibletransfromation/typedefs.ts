@@ -25,8 +25,8 @@ export type RemoveNeverKeys<T> = { [K in keyof T as T[K] extends never ? never :
 /** this utility type optionalizes all property keys that are of the `never` type.
  * ```ts
  * type MyType = { a: number, b: never, c: never, d: { e: never, f: string } }
- * type MyType_OptinallyCleansed = RemoveNeverKeys<MyType>
- * // type MyType_OptinallyCleansed === { a: number, b?: never, c?: never, d: { e: never, f: string } }
+ * type MyType_OptionallyCleansed = RemoveNeverKeys<MyType>
+ * // type MyType_OptionallyCleansed === { a: number, b?: never, c?: never, d: { e: never, f: string } }
  * ```
 */
 export type OptionalNeverKeys<T> = RemoveNeverKeys<T> & Partial<T>
@@ -97,10 +97,10 @@ interface HOTKindMap<A> {
 type ApplyHOT<HOTAlias extends keyof HOTKindMap<any>, A> = HOTKindMap<A>[HOTAlias]
 
 
-/////// Step classe definition
+/////// Step classes definition
 
 /** a single step consists a {@link forward | `forward`} transformation {@link FROM | from a type} to a {@link TO | different type},
- * and a {@link backward | `backward`} transfromation that does the reverse. <br>
+ * and a {@link backward | `backward`} transformation that does the reverse. <br>
  * if information is lost during the forward transformation, it should be stored in the {@link lost | `lost`} member,
  * and then rejoined when the backward transformation is carried out. this will ensure full invertibility of the data. <br>
  * if no information is lost during the forward transformation, it would be a good idea to use the {@link PureStep | `PureStep`} subclass instead.
@@ -135,7 +135,7 @@ export abstract class PureStep<FROM, TO> extends Step<FROM, TO, never> {
 export interface BinaryInput<ARGS = any> {
 	/** the input binary data bytes */
 	bin: Uint8Array
-	/** the byte offet to begin the parsing from */
+	/** the byte offset to begin the parsing from */
 	pos: number
 	/** additional arguments needed for the parsing */
 	args: ARGS
