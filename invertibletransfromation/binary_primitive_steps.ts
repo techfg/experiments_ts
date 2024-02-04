@@ -1,5 +1,5 @@
 import { NumericArrayType, NumericType, decode_bytes, decode_cstr, decode_number, decode_number_array, decode_str, encode_bytes, encode_cstr, encode_number, encode_number_array, encode_str } from "./deps.ts"
-import { BinaryInput, BinaryLengthedDataPureStep, BinaryOutput, BinaryPureStep, LengthedArgs } from "./typedefs.ts"
+import { BinaryInput, BinaryLengthedDataPureStep, BinaryOutput, BinaryPureStep, LengthedArgs, SubtractSubset } from "./typedefs.ts"
 
 
 export class BinaryCStringStep extends BinaryPureStep<string, never> {
@@ -92,5 +92,38 @@ export class BinaryBytesStep extends BinaryLengthedDataPureStep<Uint8Array> {
 			bin = encode_bytes(input.val),
 			length = bin.length
 		return { bin, pos: 0, args: { length } }
+	}
+}
+
+
+export class BinaryDefaultArgs<
+	STEP extends BinaryPureStep<any>,
+	OUT extends (STEP extends BinaryPureStep<infer T> ? T : unknown) = (STEP extends BinaryPureStep<infer T> ? T : unknown),
+	ARGS extends (STEP extends BinaryPureStep<OUT, infer T> ? T : unknown) = (STEP extends BinaryPureStep<OUT, infer T> ? T : unknown),
+	DEFAULT_ARGS extends Partial<ARGS> = Partial<ARGS>,
+	REQUIRED_ARGS extends SubtractSubset<DEFAULT_ARGS, ARGS> = SubtractSubset<DEFAULT_ARGS, ARGS>
+> extends BinaryPureStep<OUT, ARGS> {
+	protected readonly step: STEP
+	protected readonly args: DEFAULT_ARGS
+	protected readonly priority: -1 | 1
+	protected lost!: never
+
+	constructor(step: STEP, default_args: DEFAULT_ARGS, priority: -1 | 1 = 1) {
+		super()
+		this.step = step
+		this.args = default_args
+		this.priority = priority
+	}
+	forward(input: BinaryInput<REQUIRED_ARGS & Partial<DEFAULT_ARGS>>): BinaryOutput<OUT> {
+		const
+			{ bin, pos, args = {} as REQUIRED_ARGS } = input,
+			step = this.step,
+			default_args = this.args,
+			priority = this.priority,
+			overridden_args = priority > 0 ? { ...args, ...default_args } : { ...default_args, ...args }
+		return step.forward({ bin, pos, args: overridden_args })
+	}
+	backward(input: Omit<BinaryOutput<OUT>, "len">): BinaryInput<ARGS> {
+		return this.step.backward(input)
 	}
 }

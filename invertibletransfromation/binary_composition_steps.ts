@@ -1,4 +1,4 @@
-import { COMPILATION_MODE, compilation_mode, concatBytes } from "./deps.ts"
+import { COMPILATION_MODE, compilation_mode, concatBytes, number_POSITIVE_INFINITY } from "./deps.ts"
 import { BinaryInput, BinaryOutput, BinaryPureStep, LengthedArgs, ObjectToEntries_Mapped, OptionalNeverKeys } from "./typedefs.ts"
 
 
@@ -17,21 +17,24 @@ export class BinaryArrayStep<
 		this.item_step = item_step
 	}
 	forward(input: BinaryInput<ArrayArgs<ITEM_ARGS>>): BinaryOutput<OUT_ITEM[]> {
+		// TODO: move the functionality of infinitly parsing an array to a subclass of its own, where the `args.length` parameter becomes optional
 		const
-			{ bin, pos, args: { length, item } } = input,
-			item_step = this.item_step,
+			{ bin, pos, args: { length = number_POSITIVE_INFINITY, item } } = input,
+			bin_length = bin.byteLength,
 			out_arr: OUT_ITEM[] = []
-		let bytelength = 0
-		for (let i = 0; i < length; i++) {
-			const { val, len } = item_step.forward({
-				bin,
-				pos: pos + bytelength,
-				args: item
-			})
+		let
+			bytelength = 0,
+			i = 0
+		while (i < length && pos < bin_length) {
+			const { val, len } = this.next_forward(bin, pos + bytelength, item)
 			bytelength += len
 			out_arr.push(val)
+			i++
 		}
 		return { val: out_arr, len: bytelength }
+	}
+	protected next_forward(bin: Uint8Array, pos: number, item_args: ITEM_ARGS): BinaryOutput<OUT_ITEM> {
+		return this.item_step.forward({ bin, pos, args: item_args })
 	}
 	backward(input: Omit<BinaryOutput<OUT_ITEM[]>, "len">): BinaryInput<ArrayArgs<ITEM_ARGS>> {
 		const
@@ -65,6 +68,8 @@ export class BinaryArrayStep<
 			}
 		}
 	}
+	// TODO: create `protected next_backward` method, but I can't think of a way to also include the
+	// `if (compilation_mode === COMPILATION_MODE.DEBUG)` block in it, without making it look like an eyesore.
 }
 
 
@@ -141,9 +146,12 @@ export class BinaryRecordStep<
 		this.entry_steps = entries
 	}
 	forward(input: BinaryInput<RecordArgs<ENTRY_ARGS>>): BinaryOutput<RECORD> {
+		const { bin, pos, args = {} as ENTRY_ARGS } = input
+		return this.partial_forward(bin, pos, args) as any
+	}
+	protected partial_forward(bin: Uint8Array, pos: number, args: Partial<ENTRY_ARGS>, start: number = 0, end?: number | undefined): BinaryOutput<Partial<RECORD>> {
 		const
-			{ bin, pos, args = {} as ENTRY_ARGS } = input,
-			steps = this.entry_steps as unknown as Array<[key: keyof RECORD, step: BinaryPureStep<any, any>]>,
+			steps = this.entry_steps.slice(start, end) as unknown as Array<[key: keyof RECORD, step: BinaryPureStep<any, any>]>,
 			out_record = {} as RECORD
 		let bytelength = 0
 		for (const [key, step] of steps) {
@@ -157,10 +165,17 @@ export class BinaryRecordStep<
 		}
 	}
 	backward(input: Omit<BinaryOutput<RECORD>, "len">): BinaryInput<RecordArgs<ENTRY_ARGS>> {
+		const { bins, args } = this.partial_backward(input.val)
+		return {
+			bin: concatBytes(...bins),
+			pos: 0,
+			args: args as RecordArgs<ENTRY_ARGS>,
+		}
+	}
+	protected partial_backward(val: Partial<RECORD>, start: number = 0, end?: number | undefined): { bins: Array<Uint8Array>, args: Partial<ENTRY_ARGS> } {
 		const
-			steps = this.entry_steps as unknown as Array<[key: keyof RECORD, step: BinaryPureStep<any, any>]>,
+			steps = this.entry_steps.slice(start, end) as unknown as Array<[key: keyof RECORD, step: BinaryPureStep<any, any>]>,
 			out_bins: Uint8Array[] = [],
-			val = input.val,
 			entry_args = {} as ENTRY_ARGS
 		for (const [key, step] of steps) {
 			const { bin, args } = step.backward({ val: val[key] })
@@ -168,9 +183,13 @@ export class BinaryRecordStep<
 			out_bins.push(bin)
 		}
 		return {
-			bin: concatBytes(...out_bins),
-			pos: 0,
+			bins: out_bins,
 			args: entry_args,
 		}
 	}
+}
+
+
+export class SequentialSteps {
+	// TODO: implement this
 }

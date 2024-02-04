@@ -2,6 +2,17 @@
 
 /////// Utility types
 
+/** subtract an interface subset `B` from its superset `A`.
+ * @typeParam B the subset type
+ * @typeParam A th superset type
+ * @example
+ * ```ts
+ * type C = SubtractSubset<{ a: number, c?: symbol }, { a: number, b: string, c: symbol }>
+ * // type C == { b: string }
+ * ```
+*/
+export type SubtractSubset<B, A extends B> = Pick<A, Exclude<keyof A, keyof B>>
+
 /** this utility type returns a union of all the keys that have been assigned as `never`.
  * @example
  * ```ts
