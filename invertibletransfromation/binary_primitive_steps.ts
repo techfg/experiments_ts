@@ -1,5 +1,5 @@
 import { NumericArrayType, NumericType, decode_bytes, decode_cstr, decode_number, decode_number_array, decode_str, encode_bytes, encode_cstr, encode_number, encode_number_array, encode_str } from "./deps.ts"
-import { BinaryInput, BinaryLengthedDataPureStep, BinaryOutput, BinaryPureStep, LengthedArgs, SubtractSubset } from "./typedefs.ts"
+import { BinaryInput, BinaryLengthedDataPureStep, BinaryOutput, BinaryPureStep, LengthedArgs, PureStep, SubtractSubset } from "./typedefs.ts"
 
 
 export class BinaryCStringStep extends BinaryPureStep<string, never> {
@@ -126,4 +126,34 @@ export class BinaryDefaultArgs<
 	backward(input: Omit<BinaryOutput<OUT>, "len">): BinaryInput<ARGS> {
 		return this.step.backward(input)
 	}
+}
+
+
+export class BinaryOutputUnwrapStep<T> extends PureStep<Omit<BinaryOutput<T>, "len">, T> {
+	protected lost!: never
+	forward(input: BinaryOutput<T>): T { return input.val }
+	backward(input: T): Omit<BinaryOutput<T>, "len"> { return { val: input } }
+}
+
+
+// TODO: add a warning about forward method's `output.len === undefined`, as it might ruin accumulated
+// size computation, and will be hard to debug and come across this as being the culprit
+export class BinaryOutputWrapStep<T> extends PureStep<T, BinaryOutput<T>> {
+	protected lost!: never
+	forward(input: T): BinaryOutput<T> { return { val: input, len: undefined as any } }
+	backward(input: BinaryOutput<T>): T { return input.val }
+}
+
+
+export class BinaryInputUnwrapStep extends PureStep<BinaryInput, Uint8Array> {
+	protected lost!: never
+	forward(input: BinaryInput): Uint8Array { return input.bin }
+	backward(input: Uint8Array): BinaryInput { return { bin: input, pos: 0, args: undefined } }
+}
+
+
+export class BinaryInputWrapStep extends PureStep<Uint8Array, BinaryInput> {
+	protected lost!: never
+	forward(input: Uint8Array): BinaryInput { return { bin: input, pos: 0, args: undefined } }
+	backward(input: BinaryInput): Uint8Array { return input.bin }
 }

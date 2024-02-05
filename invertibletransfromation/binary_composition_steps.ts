@@ -1,5 +1,5 @@
 import { COMPILATION_MODE, compilation_mode, concatBytes, number_POSITIVE_INFINITY } from "./deps.ts"
-import { BinaryInput, BinaryOutput, BinaryPureStep, LengthedArgs, ObjectToEntries_Mapped, OptionalNeverKeys } from "./typedefs.ts"
+import { BinaryInput, BinaryOutput, BinaryPureStep, LengthedArgs, ObjectToEntries_Mapped, OptionalNeverKeys, PureStep } from "./typedefs.ts"
 
 
 export interface ArrayArgs<ITEM_ARGS> extends LengthedArgs {
@@ -17,15 +17,15 @@ export class BinaryArrayStep<
 		this.item_step = item_step
 	}
 	forward(input: BinaryInput<ArrayArgs<ITEM_ARGS>>): BinaryOutput<OUT_ITEM[]> {
-		// TODO: move the functionality of infinitly parsing an array to a subclass of its own, where the `args.length` parameter becomes optional
+		// TODO: move the functionality of infinitely parsing an array to a subclass of its own, where the `args.length` parameter becomes optional
 		const
-			{ bin, pos, args: { length = number_POSITIVE_INFINITY, item } } = input,
+			{ bin, pos, args: { length = number_POSITIVE_INFINITY, item = {} as any } = {} } = input,
 			bin_length = bin.byteLength,
 			out_arr: OUT_ITEM[] = []
 		let
 			bytelength = 0,
 			i = 0
-		while (i < length && pos < bin_length) {
+		while (i < length && pos + bytelength < bin_length) {
 			const { val, len } = this.next_forward(bin, pos + bytelength, item)
 			bytelength += len
 			out_arr.push(val)
@@ -190,6 +190,42 @@ export class BinaryRecordStep<
 }
 
 
-export class SequentialSteps {
-	// TODO: implement this
+export class SequentialSteps<
+	FROM,
+	TO,
+	FIRST extends PureStep<FROM, any> = PureStep<FROM, any>,
+	LAST extends PureStep<any, TO> = PureStep<any, TO>,
+	STEPS extends [first: FIRST, ...intermediate_steps: PureStep<any, any>[], last: LAST] = [first: FIRST, ...intermediate_steps: PureStep<any, any>[], last: LAST],
+> extends PureStep<FROM, TO> {
+	protected readonly steps: STEPS
+	protected lost!: never
+
+	constructor(...steps: STEPS) {
+		super()
+		this.steps = steps
+	}
+	forward(input: FROM): TO {
+		const steps_len = this.steps.length
+		let output: any = input
+		for (let i = 0; i < steps_len; i++) {
+			output = this.next_forward(output, i)
+		}
+		return output
+	}
+	protected next_forward(input: any | FROM, step_index: number): any | TO {
+		const step = this.steps[step_index]
+		return step.forward(input)
+	}
+	backward(input: TO,): FROM {
+		const steps_len = this.steps.length
+		let output: any = input
+		for (let i = 0; i < steps_len; i++) {
+			output = this.next_backward(output, i)
+		}
+		return output
+	}
+	protected next_backward(input: any | TO, step_reverse_index: number): any | FROM {
+		const step = this.steps.at(- 1 - step_reverse_index)!
+		return step.backward(input)
+	}
 }
