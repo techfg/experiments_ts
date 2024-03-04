@@ -4,6 +4,7 @@ export { object_entries } from "https://deno.land/x/kitchensink_ts@v0.7.5/builti
 export { isFunction } from "https://deno.land/x/kitchensink_ts@v0.7.5/struct.ts"
 export type { ConstructorOf } from "https://deno.land/x/kitchensink_ts@v0.7.5/typedefs.ts"
 
+// TODO: implement jsxFrag
 
 export const enum DEBUG {
 	LOG = 0,

@@ -1,16 +1,10 @@
-type AttributeKey = string | number
+type AttributeKey = string
 interface Attributes {
-	key?: AttributeKey
+	[key: AttributeKey]: string
 }
-// interface RefAttributes<T> extends Attributes {
-// 	ref?: Ref<T>
-// }
-// interface ClassAttributes<T> extends Attributes {
-// 	ref?: LegacyRef<T>
-// }
 
-type IntrinsicHTMLElements = { [tagName in keyof HTMLElementTagNameMap]: { [key: string]: string } }
-type IntrinsicSVGElements = { [tagName in keyof SVGElementTagNameMap]: { [key: string]: string } }
+type IntrinsicHTMLElements = { [tagName in keyof HTMLElementTagNameMap]: Attributes }
+type IntrinsicSVGElements = { [tagName in keyof SVGElementTagNameMap]: Attributes }
 
 declare global {
 	export namespace JSX {
