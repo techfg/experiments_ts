@@ -66,7 +66,7 @@
  * @module
 */
 
-import { ConstructorOf, ValuesOf, bind_array_pop, bind_array_push, bind_map_get, bind_stack_seek, isFunction, object_entries } from "./deps.ts"
+import { ConstructorOf, ValuesOf, array_isArray, bind_array_pop, bind_array_push, bind_map_get, bind_stack_seek, isFunction, object_entries } from "./deps.ts"
 
 
 export type RenderKind = symbol
@@ -87,8 +87,10 @@ export abstract class HyperRender<TAG = any, OUTPUT = any> {
 	abstract h(tag: TAG, props?: null | { [key: PropertyKey]: any }, ...children: any[]): OUTPUT
 }
 
-export type ComponentGenerator<P = {}> = (props?: null | P) => Element
-export class Component_Render extends HyperRender<ComponentGenerator, Element> {
+export type SingleComponentGenerator<P = {}> = (props?: P) => Element
+export type FragmentComponentGenerator<P = {}> = (props?: P) => (string | Element)[]
+export type ComponentGenerator<P = {}> = SingleComponentGenerator<P> | FragmentComponentGenerator<P>
+export class Component_Render extends HyperRender<ComponentGenerator, Element | (string | Element)[]> {
 	test(tag: any, props?: any): boolean { return isFunction(tag) }
 
 	h<
@@ -97,7 +99,9 @@ export class Component_Render extends HyperRender<ComponentGenerator, Element> {
 	>(component: C, props: P, ...children: (string | Node)[]): ReturnType<C> {
 		props ??= {} as P
 		const component_node = component(props) as ReturnType<C>
-		component_node.append(...children)
+		array_isArray(component_node)
+			? component_node.push(...children as (string | Element)[])
+			: component_node.append(...children)
 		return component_node
 	}
 }
@@ -128,8 +132,8 @@ export class SVGElement_Render extends HyperRender<keyof SVGElementTagNameMap, V
 		for (const [attr_name, attr_value] of object_entries(props)) {
 			// svg doesn't work when their attributes are made with a namespaceURI (i.e. createAttributeNS doesn't work for svgs). strange.
 			const attr = document.createAttribute(attr_name)
-			element.setAttributeNode(attr)
 			attr.nodeValue = attr_value
+			element.setAttributeNode(attr)
 		}
 		element.append(...children)
 		return element
@@ -141,6 +145,11 @@ const
 	PushScope = Symbol("pushed a scope"),
 	PopScope = Symbol("popped a scope"),
 	node_only_child_filter = (child: symbol | Node) => (typeof child !== "symbol")
+
+export const Fragment = Symbol("indication for a fragment component")
+
+type HyperScopeChild = typeof PushScope | typeof PopScope | Node
+type HyperScopeChildren = (HyperScopeChild | Array<HyperScopeChild>)[]
 
 export class HyperScope extends HyperRender<any, any> {
 	protected renderers: Map<RenderKind, HyperRender> = new Map()
@@ -185,12 +194,17 @@ export class HyperScope extends HyperRender<any, any> {
 		return false
 	}
 
-	h(tag: any, props: any, ...children: Array<typeof PushScope | typeof PopScope | Node>) {
+	h(tag: typeof Fragment, props: null, ...children: HyperScopeChildren): Element[]
+	h(tag: any, props: any, ...children: HyperScopeChildren): Element
+	h(tag: typeof Fragment | any, props: any, ...children: HyperScopeChildren): undefined | Element | Element[] {
+		if (tag === Fragment) {
+			return children as Element[]
+		}
 		for (const renderer of this.seekScope()) {
 			if (renderer.test(tag, props)) {
-				return renderer.h(tag, props, ...children.filter(node_only_child_filter))
+				const flat_children = children.flat(1).filter(node_only_child_filter)
+				return renderer.h(tag, props, ...flat_children)
 			}
 		}
-
 	}
 }

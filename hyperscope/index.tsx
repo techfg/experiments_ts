@@ -1,8 +1,9 @@
 /** @jsx h */
+/** @jsxFrag Fragment */
 
 import { bindMethodToSelfByName } from "./deps.ts"
 import { } from "./jsx.ts"
-import { Component_Render, HTMLElement_Render, HyperScope, SVGElement_Render } from "./mod.ts"
+import { Component_Render, Fragment, HTMLElement_Render, HyperScope, SVGElement_Render } from "./mod.ts"
 
 const hyperscope = new HyperScope(
 	new Component_Render("component jsx renderer"),
@@ -14,27 +15,37 @@ const SVG_SCOPE = svg_renderer.kind
 const h = bindMethodToSelfByName(hyperscope, "h")
 const { pushScope, popScope } = hyperscope
 
-const a = <div>
+const my_div = <div>
 	<span>Hello</span>
+	<span>World</span>
 	{pushScope(SVG_SCOPE)}
-	<svg width="200px" height="200px" viewBox="0 0 200 200"><g>
-		<text text-anchor="left" y="100">NOICEEE</text>
+	<svg width="100px" height="50px" viewBox="0 0 100 50"><g>
+		<text text-anchor="left" y="25">NOICEEE SVG!</text>
 	</g></svg>
 	{popScope()}
-	<span>World</span>
+	<>
+		<span>ZA</span>
+		<span>WARUDO!</span>
+		<span>TOKYO WA TOMARE!</span>
+	</>
 </div>
 /** renders into:
 const a = h("div", null,
 	h("span", null, "Hello"),
+	h("span", null, "World"),
 	pushScope(SVG_SCOPE),
-	h("svg", { width: "200px", height: "200px", viewBox: "0 0 200 200" },
+	h("svg", { width: "100px", height: "50px", viewBox: "0 0 100 50" },
 		h("g", null,
-			h("text", { "text-anchor": "left", y: "100" }, "NOICEEE")
+			h("text", { "text-anchor": "left", y: "25" }, "NOICEEE SVG!")
 		)
 	),
 	popScope(),
-	h("span", null, "World")
+	h(Fragment, null,
+		h("span", null, "ZA"),
+		h("span", null, "WARUDO!"),
+		h("span", null, "TOKYO WA TOMARE!"),
+	)
 )
 */
 
-document.body.appendChild(a)
+document.body.appendChild(my_div)
