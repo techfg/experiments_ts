@@ -66,7 +66,7 @@
  * @module
 */
 
-import { ConstructorOf, ValuesOf, array_isArray, bind_array_pop, bind_array_push, bind_map_get, bind_stack_seek, isFunction, object_entries } from "./deps.ts"
+import { ConstructorOf, array_isArray, bind_array_pop, bind_array_push, bind_map_get, bind_stack_seek, isFunction, object_entries } from "./deps.ts"
 
 
 export type RenderKind = symbol
@@ -93,13 +93,13 @@ export type AttrProps = { [attr: string]: any }
 export type SingleComponentGenerator<P = {}> = (props?: P & { [ATTRS]?: AttrProps }) => Element
 export type FragmentComponentGenerator<P = {}> = (props?: P) => (string | Element)[]
 export type ComponentGenerator<P = {}> = SingleComponentGenerator<P> | FragmentComponentGenerator<P>
-export class Component_Render extends HyperRender<ComponentGenerator, Element | (string | Element)[]> {
+export class Component_Render<G extends ComponentGenerator = ComponentGenerator> extends HyperRender<G> {
 	test(tag: any, props?: any): boolean { return isFunction(tag) }
 
 	h<
-		C extends ComponentGenerator,
+		C extends G,
 		P extends (C extends ComponentGenerator<infer PROPS> ? PROPS : undefined | null | object) = any
-	>(component: C, props: P & { [ATTRS]?: AttrProps }, ...children: (string | Node)[]): ReturnType<C> {
+	>(component: C, props: P & { [ATTRS]?: AttrProps | undefined | null }, ...children: (string | Node)[]): ReturnType<C> {
 		props ??= {} as P & { [ATTRS]?: AttrProps }
 		const component_node = component(props) as ReturnType<C>
 		if (array_isArray(component_node)) {
@@ -117,37 +117,23 @@ export class Component_Render extends HyperRender<ComponentGenerator, Element | 
 	}
 }
 
-export class HTMLElement_Render extends HyperRender<keyof HTMLElementTagNameMap, ValuesOf<HTMLElementTagNameMap>> {
+const HTMLTagComponent = <TAG extends keyof HTMLElementTagNameMap = any>(props?: { tag?: TAG }): HTMLElementTagNameMap[TAG] => document.createElement(props!.tag!)
+export class HTMLElement_Render extends Component_Render<typeof HTMLTagComponent> {
 	test(tag: any, props?: any): boolean { return typeof tag === "string" }
 
+	// @ts-ignore: we are breaking subclassing inheritance rules by having `tag: string` as the first argument instead of `component: ComponentGenerator`
 	h<TAG extends keyof HTMLElementTagNameMap>(tag: TAG, props?: null | AttrProps, ...children: (string | Node)[]): HTMLElementTagNameMap[TAG] {
-		props ??= {}
-		const element = document.createElement(tag)
-		for (const [attr_name, attr_value] of object_entries(props)) {
-			const attr = document.createAttribute(attr_name)
-			element.setAttributeNode(attr)
-			attr.nodeValue = attr_value
-			// createAttr(attr, attr_value)
-		}
-		element.append(...children)
-		return element
+		return super.h(HTMLTagComponent, { tag, [ATTRS]: props }, ...children) as HTMLElementTagNameMap[TAG]
 	}
 }
 
-export class SVGElement_Render extends HyperRender<keyof SVGElementTagNameMap, ValuesOf<SVGElementTagNameMap>> {
+const SVGTagComponent = <TAG extends keyof SVGElementTagNameMap = any>(props?: { tag?: TAG }): SVGElementTagNameMap[TAG] => document.createElementNS("http://www.w3.org/2000/svg", props!.tag!)
+export class SVGElement_Render extends Component_Render<typeof SVGTagComponent> {
 	test(tag: any, props?: any): boolean { return typeof tag === "string" }
 
+	// @ts-ignore: we are breaking subclassing inheritance rules by having `tag: string` as the first argument instead of `component: ComponentGenerator`
 	h<TAG extends keyof SVGElementTagNameMap>(tag: TAG, props?: null | AttrProps, ...children: (string | Node)[]): SVGElementTagNameMap[TAG] {
-		props ??= {}
-		const element = document.createElementNS("http://www.w3.org/2000/svg", tag)
-		for (const [attr_name, attr_value] of object_entries(props)) {
-			// svg doesn't work when their attributes are made with a namespaceURI (i.e. createAttributeNS doesn't work for svgs). strange.
-			const attr = document.createAttribute(attr_name)
-			attr.nodeValue = attr_value
-			element.setAttributeNode(attr)
-		}
-		element.append(...children)
-		return element
+		return super.h(SVGTagComponent, { tag, [ATTRS]: props }, ...children) as SVGElementTagNameMap[TAG]
 	}
 }
 
