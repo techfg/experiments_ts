@@ -87,63 +87,125 @@ export abstract class HyperRender<TAG = any, OUTPUT = any> {
 	abstract h(tag: TAG, props?: null | { [key: PropertyKey]: any }, ...children: any[]): OUTPUT
 }
 
-export const ATTRS = Symbol("explicitly declared Element attributes of a Component")
+export const ATTRS = Symbol("explicitly declared Element attributes of a single Component")
 export type AttrProps = { [attr: string]: any }
 
-export type SingleComponentGenerator<P = {}> = (props?: P & { [ATTRS]?: AttrProps }) => Element
+export type EventFn<NAME extends keyof HTMLElementEventMap> = (this: Element, event: HTMLElementEventMap[NAME]) => void
+export const EVENTS = Symbol("explicitly declared event listeners of a single Component")
+export type EventProps = { [event_name in keyof HTMLElementEventMap]?: EventFn<event_name> }
+
+export const ADVANCED_EVENTS = Symbol("explicitly declared advaced configurable events")
+export type AdvancedEvenProps = { [event_name in keyof HTMLElementEventMap]?: [event_fn: EventFn<event_name>, options?: boolean | AddEventListenerOptions] }
+
+export interface DefaultProps {
+	[ATTRS]?: AttrProps | undefined | null
+	[EVENTS]?: EventProps | undefined | null
+	[ADVANCED_EVENTS]?: AdvancedEvenProps | undefined | null
+}
+
+export type Props<P = {}> = P & DefaultProps
+
+export type SingleComponentGenerator<P = {}> = (props?: Props<P>) => Element
 export type FragmentComponentGenerator<P = {}> = (props?: P) => (string | Element)[]
 export type ComponentGenerator<P = {}> = SingleComponentGenerator<P> | FragmentComponentGenerator<P>
+
 export class Component_Render<G extends ComponentGenerator = ComponentGenerator> extends HyperRender<G> {
 	test(tag: any, props?: any): boolean { return isFunction(tag) }
 
 	h<
 		C extends G,
 		P extends (C extends ComponentGenerator<infer PROPS> ? PROPS : undefined | null | object) = any
-	>(component: C, props: P & { [ATTRS]?: AttrProps | undefined | null }, ...children: (string | Node)[]): ReturnType<C> {
-		props ??= {} as P & { [ATTRS]?: AttrProps }
+	>(component: C, props: Props<P>, ...children: (string | Node)[]): ReturnType<C> {
+		props ??= {} as Props<P>
+		children = children.map((child) => this.processChild(child))
 		const component_node = component(props) as ReturnType<C>
 		if (array_isArray(component_node)) {
 			component_node.push(...children as (string | Element)[])
-		} else {
-			for (const [attr_name, attr_value] of object_entries(props[ATTRS] ?? {})) {
-				const attr = document.createAttribute(attr_name)
-				attr.nodeValue = attr_value
-				component_node.setAttributeNode(attr)
-				// createAttr(attr, attr_value)
-			}
-			component_node.append(...children)
+			return component_node
 		}
+		for (const [attr_name, attr_value] of object_entries(props[ATTRS] ?? {})) {
+			this.addAttr(component_node, attr_name, attr_value)
+		}
+		for (const [event_name, event_fn] of object_entries(props[EVENTS] ?? {})) {
+			this.addEvent(component_node, event_name, event_fn)
+		}
+		for (const [event_name, [event_fn, options]] of object_entries(props[ADVANCED_EVENTS] ?? {})) {
+			this.addEvent(component_node, event_name, event_fn, options)
+		}
+		component_node.append(...children)
 		return component_node
+	}
+
+	protected addAttr(element: Element, attribute_name: string, attribute_value: any): void {
+		const attr = document.createAttribute(attribute_name)
+		attr.nodeValue = attribute_value
+		element.setAttributeNode(attr)
+	}
+
+	protected addEvent(
+		element: Element,
+		event_name: string,
+		event_fn: EventFn<any>,
+		options?: boolean | AddEventListenerOptions
+	): void {
+		element.addEventListener(event_name, event_fn, options)
+	}
+
+	protected processChild(child: string | Node): string | Node {
+		return child
 	}
 }
 
-const HTMLTagComponent = <TAG extends keyof HTMLElementTagNameMap = any>(props?: { tag?: TAG }): HTMLElementTagNameMap[TAG] => document.createElement(props!.tag!)
+const normalizeElementProps = (props?: null | Props<AttrProps>): Props<{}> => {
+	const {
+		[EVENTS]: event_props,
+		[ADVANCED_EVENTS]: advanced_events_props,
+		[ATTRS]: other_attr_props,
+		...attr_props
+	} = props ?? {}
+	return {
+		[EVENTS]: event_props,
+		[ADVANCED_EVENTS]: advanced_events_props,
+		[ATTRS]: { ...attr_props, ...other_attr_props },
+	}
+}
+
+export const HTMLTagComponent = <TAG extends keyof HTMLElementTagNameMap = any>(props?: Props<{ tag?: TAG }>): HTMLElementTagNameMap[TAG] => document.createElement(props!.tag!)
 export class HTMLElement_Render extends Component_Render<typeof HTMLTagComponent> {
 	test(tag: any, props?: any): boolean { return typeof tag === "string" }
 
 	// @ts-ignore: we are breaking subclassing inheritance rules by having `tag: string` as the first argument instead of `component: ComponentGenerator`
-	h<TAG extends keyof HTMLElementTagNameMap>(tag: TAG, props?: null | AttrProps, ...children: (string | Node)[]): HTMLElementTagNameMap[TAG] {
-		return super.h(HTMLTagComponent, { tag, [ATTRS]: props }, ...children) as HTMLElementTagNameMap[TAG]
+	h<TAG extends keyof HTMLElementTagNameMap>(tag: TAG, props?: null | Props<AttrProps>, ...children: (string | Node)[]): HTMLElementTagNameMap[TAG] {
+		return super.h(HTMLTagComponent, { tag, ...normalizeElementProps(props) }, ...children) as HTMLElementTagNameMap[TAG]
 	}
 }
 
-const SVGTagComponent = <TAG extends keyof SVGElementTagNameMap = any>(props?: { tag?: TAG }): SVGElementTagNameMap[TAG] => document.createElementNS("http://www.w3.org/2000/svg", props!.tag!)
+export const SVGTagComponent = <TAG extends keyof SVGElementTagNameMap = any>(props?: Props<{ tag?: TAG }>): SVGElementTagNameMap[TAG] => document.createElementNS("http://www.w3.org/2000/svg", props!.tag!)
 export class SVGElement_Render extends Component_Render<typeof SVGTagComponent> {
 	test(tag: any, props?: any): boolean { return typeof tag === "string" }
 
 	// @ts-ignore: we are breaking subclassing inheritance rules by having `tag: string` as the first argument instead of `component: ComponentGenerator`
-	h<TAG extends keyof SVGElementTagNameMap>(tag: TAG, props?: null | AttrProps, ...children: (string | Node)[]): SVGElementTagNameMap[TAG] {
-		return super.h(SVGTagComponent, { tag, [ATTRS]: props }, ...children) as SVGElementTagNameMap[TAG]
+	h<TAG extends keyof SVGElementTagNameMap>(tag: TAG, props?: null | Props<AttrProps>, ...children: (string | Node)[]): SVGElementTagNameMap[TAG] {
+		return super.h(SVGTagComponent, { tag, ...normalizeElementProps(props) }, ...children) as SVGElementTagNameMap[TAG]
 	}
 }
 
+export const Fragment = Symbol("indication for a fragment component")
+export const FragmentTagComponent = (props?: any) => [] as Element[]
+export class Fragment_Render extends Component_Render {
+	test(tag: any, props?: any): boolean { return tag === Fragment }
+
+	// @ts-ignore: we are breaking subclassing inheritance rules by having `tag: Fragment` as the first argument instead of `component: ComponentGenerator`
+	h(tag: Fragment, props?: null, ...children: (string | Node)[]): Element[] {
+		return super.h(FragmentTagComponent, {}, ...children)
+	}
+}
 
 const
 	PushScope = Symbol("pushed a scope"),
 	PopScope = Symbol("popped a scope"),
 	node_only_child_filter = (child: symbol | Node) => (typeof child !== "symbol")
 
-export const Fragment = Symbol("indication for a fragment component")
 
 type HyperScopeChild = typeof PushScope | typeof PopScope | Node
 type HyperScopeChildren = (HyperScopeChild | Array<HyperScopeChild>)[]
@@ -193,10 +255,7 @@ export class HyperScope extends HyperRender<any, any> {
 
 	h(tag: typeof Fragment, props: null, ...children: HyperScopeChildren): Element[]
 	h(tag: any, props: any, ...children: HyperScopeChildren): Element
-	h(tag: typeof Fragment | any, props: any, ...children: HyperScopeChildren): undefined | Element | Element[] {
-		if (tag === Fragment) {
-			return children as Element[]
-		}
+	h(tag: any, props: any, ...children: HyperScopeChildren): undefined | Element | Element[] {
 		for (const renderer of this.seekScope()) {
 			if (renderer.test(tag, props)) {
 				const flat_children = children.flat(1).filter(node_only_child_filter)
