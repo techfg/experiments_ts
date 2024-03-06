@@ -1,41 +1,23 @@
 /** some build specific utility functions */
-import { ensureDir } from "https://deno.land/std@0.204.0/fs/mod.ts"
-import { join as pathJoin } from "https://deno.land/std@0.204.0/path/mod.ts"
-import { BuildOptions, PackageJson } from "https://deno.land/x/dnt@0.38.1/mod.ts"
+export { build as dntBuild } from "https://deno.land/x/dnt@0.40.0/mod.ts"
+export type {
+	BuildOptions as ESBuildOptions,
+	OutputFile as ESOutputFile,
+	TransformOptions as ESTransformOptions
+} from "https://deno.land/x/esbuild@v0.20.1/mod.js"
+export { copy as copyFolder, emptyDir, ensureDir, ensureFile } from "jsr:@std/fs@0.218.2"
+export { dirname as pathDirname, join as pathJoin, relative as relativePath } from "jsr:@std/path@0.218.2"
+import { BuildOptions, PackageJson } from "https://deno.land/x/dnt@0.40.0/mod.ts"
 import {
 	BuildOptions as ESBuildOptions,
 	OutputFile as ESOutputFile,
 	TransformOptions as ESTransformOptions,
 	build as esbuild, stop as esstop, transform as estransform
-} from "https://deno.land/x/esbuild@v0.17.19/mod.js"
-import { denoPlugins } from "https://deno.land/x/esbuild_deno_loader@0.8.1/mod.ts"
+} from "https://deno.land/x/esbuild@v0.20.1/mod.js"
+import { denoPlugins } from "jsr:@luca/esbuild-deno-loader@0.9.0"
+import { ensureDir } from "jsr:@std/fs@0.218.2"
+import { join as pathJoin } from "jsr:@std/path@0.218.2"
 
-
-export const mainEntrypoint: string = "./src/mod.ts"
-export const subEntrypoints: string[] = [
-	"./src/array2d.ts",
-	"./src/binder.ts",
-	"./src/browser.ts",
-	"./src/builtin_aliases_deps.ts",
-	"./src/builtin_aliases.ts",
-	"./src/collections.ts",
-	"./src/crypto.ts",
-	"./src/devdebug.ts",
-	"./src/dotkeypath.ts",
-	"./src/eightpack.ts",
-	"./src/eightpack_varint.ts",
-	"./src/formattable.ts",
-	"./src/image.ts",
-	"./src/lambda.ts",
-	"./src/lambdacalc.ts",
-	"./src/mapper.ts",
-	"./src/numericarray.ts",
-	"./src/numericmethods.ts",
-	"./src/stringman.ts",
-	"./src/struct.ts",
-	"./src/typedbuffer.ts",
-	"./src/typedefs.ts",
-]
 
 export interface LeftoverArtifacts {
 	cleanup: () => Promise<void>
@@ -50,18 +32,25 @@ interface NPM_Artifacts extends TemporaryFiles {
 	files: ["package.json", "tsconfig.json"]
 }
 
-let deno_json: { [key: string]: any }
+const get_deno_json = async () => { return (await import("./deno.json", { with: { type: "json" } })).default }
+const add_leading_relative_path_slash = (path: string) => path.startsWith("./") ? path : "./" + path
+let deno_json: ReturnType<typeof get_deno_json>
 export const getDenoJson = async (base_dir: string = "./") => {
-	deno_json ??= JSON.parse(await Deno.readTextFile(pathJoin(base_dir, "./deno.json")))
+	deno_json ??= (await import(
+		add_leading_relative_path_slash(pathJoin(base_dir, "./deno.json")),
+		{ with: { type: "json" } })
+	).default
 	return deno_json
 }
 
 export const createPackageJson = async (deno_json_dir: string = "./", overrides: Partial<PackageJson> = {}): Promise<PackageJson> => {
-	const { name, version, description, author, license, repository, bugs, devDependencies } = await getDenoJson(deno_json_dir)
+	const { name, version, description, author, license, repository, bugs, exports, package_json } = await getDenoJson(deno_json_dir)
+	// note that if you use dnt (deno-to-node), then you will have to delete the `exports` property, otherwise it will ruin the output.
 	return {
 		name: name ?? "",
 		version: version ?? "0.0.0",
-		description, author, license, repository, bugs, devDependencies,
+		description, author, license, repository, bugs, exports,
+		...package_json,
 		...overrides
 	}
 }
@@ -69,7 +58,7 @@ export const createPackageJson = async (deno_json_dir: string = "./", overrides:
 export const createTSConfigJson = async (deno_json_dir: string = "./", overrides: Partial<{ compilerOptions: BuildOptions["compilerOptions"] }> = {}): Promise<{ "$schema": string, compilerOptions: BuildOptions["compilerOptions"] }> => {
 	const { compilerOptions } = await getDenoJson(deno_json_dir)
 	// remove "deno.ns" from compiler options, as it breaks `dnt` (I think)
-	compilerOptions.lib = (compilerOptions.lib as string[]).filter((v) => v.toLowerCase() !== "deno.ns")
+	compilerOptions.lib = (compilerOptions.lib).filter((v) => v.toLowerCase() !== "deno.ns")
 	Object.assign(compilerOptions,
 		{
 			target: "ESNext",
@@ -84,7 +73,7 @@ export const createTSConfigJson = async (deno_json_dir: string = "./", overrides
 		"$schema": "https://json.schemastore.org/tsconfig",
 		...overrides,
 		compilerOptions,
-	}
+	} as any
 }
 
 export const createNPMFiles = async (
@@ -126,8 +115,9 @@ export const createNPMFiles = async (
 export const doubleCompileFiles = async (
 	compile_file_path: string,
 	out_dir: string,
-	overrid_bundle_options: ESBuildOptions = {},
-	overrid_minify_options: ESTransformOptions = {},
+	override_bundle_options: ESBuildOptions = {},
+	override_minify_options: ESTransformOptions = {},
+	stop: boolean = true
 ) => {
 	let t0 = performance.now(), t1: number
 
@@ -140,31 +130,32 @@ export const doubleCompileFiles = async (
 		format: "esm",
 		target: "esnext",
 		plugins: [...denoPlugins()],
-		...overrid_bundle_options,
+		...override_bundle_options,
 		write: false,
 	})
 
 	const bundled_files = await Promise.all(bundled_code.outputFiles.map(
-		async ({ text, path }, file_number): Promise<ESOutputFile> => {
+		async ({ text, path, hash }, file_number): Promise<ESOutputFile> => {
 			const
 				js_text = (await estransform(text, {
 					minify: true,
 					platform: "browser",
 					format: "esm",
 					target: "esnext",
-					...overrid_minify_options
+					...override_minify_options
 				})).code,
 				js_text_uint8 = (new TextEncoder()).encode(js_text)
-			console.log("bundled file", file_number, "\n\t" ,"output path:", path, "\n\t", "binary size:", js_text_uint8.byteLength / 1024, "kb")
+			console.log("bundled file", file_number, "\n\t", "output path:", path, "\n\t", "binary size:", js_text_uint8.byteLength / 1024, "kb")
 			return {
 				path,
+				hash,
 				text: js_text,
 				contents: js_text_uint8
 			}
 		}
 	))
 
-	esstop()
+	if (stop) { esstop() }
 	t1 = performance.now()
 	console.log("bundling time:", t1 - t0, "ms")
 	return bundled_files

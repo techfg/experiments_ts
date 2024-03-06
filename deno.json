@@ -11,6 +11,23 @@
 	"bugs": {
 		"url": "https://github.com/omar-azmi/experiments_ts/issues"
 	},
+	"exports": {},
+	"test": {
+		"include": [
+			"./test/",
+			"./src/mod.ts"
+		]
+	},
+	"fmt": {
+		"useTabs": true,
+		"semiColons": false,
+		"singleQuote": false,
+		"lineWidth": 800,
+		"proseWrap": "never",
+		"include": [
+			"./src/"
+		]
+	},
 	"compilerOptions": {
 		"lib": [
 			"esnext",
@@ -20,9 +37,13 @@
 		"strict": true,
 		"allowJs": true
 	},
-	"devDependencies": {
-		"typescript": "^5.0.0",
-		"esbuild": "^0.17.19"
+	"package_json": {
+		"dependencies": {},
+		"devDependencies": {
+			"typescript": "^5.0.0",
+			"esbuild": "^0.20.1"
+		},
+		"keywords": []
 	},
 	"node_packageManager": "npm",
 	"tasks": {
@@ -31,6 +52,6 @@
 		"build-npm": "deno run -A ./build_npm.ts",
 		"build-npm-dist": "cd \"./npm/\" && npm run build-dist",
 		"clean": "deno run -A ./clean.ts",
-		"test": "deno test -A ./src/mod.ts && deno test -A ./test/"
+		"test": "deno test -A"
 	}
 }
