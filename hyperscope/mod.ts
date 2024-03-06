@@ -87,7 +87,10 @@ export abstract class HyperRender<TAG = any, OUTPUT = any> {
 	abstract h(tag: TAG, props?: null | { [key: PropertyKey]: any }, ...children: any[]): OUTPUT
 }
 
-export type SingleComponentGenerator<P = {}> = (props?: P) => Element
+export const ATTRS = Symbol("explicitly declared Element attributes of a Component")
+export type AttrProps = { [attr: string]: any }
+
+export type SingleComponentGenerator<P = {}> = (props?: P & { [ATTRS]?: AttrProps }) => Element
 export type FragmentComponentGenerator<P = {}> = (props?: P) => (string | Element)[]
 export type ComponentGenerator<P = {}> = SingleComponentGenerator<P> | FragmentComponentGenerator<P>
 export class Component_Render extends HyperRender<ComponentGenerator, Element | (string | Element)[]> {
@@ -96,12 +99,20 @@ export class Component_Render extends HyperRender<ComponentGenerator, Element | 
 	h<
 		C extends ComponentGenerator,
 		P extends (C extends ComponentGenerator<infer PROPS> ? PROPS : undefined | null | object) = any
-	>(component: C, props: P, ...children: (string | Node)[]): ReturnType<C> {
-		props ??= {} as P
+	>(component: C, props: P & { [ATTRS]?: AttrProps }, ...children: (string | Node)[]): ReturnType<C> {
+		props ??= {} as P & { [ATTRS]?: AttrProps }
 		const component_node = component(props) as ReturnType<C>
-		array_isArray(component_node)
-			? component_node.push(...children as (string | Element)[])
-			: component_node.append(...children)
+		if (array_isArray(component_node)) {
+			component_node.push(...children as (string | Element)[])
+		} else {
+			for (const [attr_name, attr_value] of object_entries(props[ATTRS] ?? {})) {
+				const attr = document.createAttribute(attr_name)
+				attr.nodeValue = attr_value
+				component_node.setAttributeNode(attr)
+				// createAttr(attr, attr_value)
+			}
+			component_node.append(...children)
+		}
 		return component_node
 	}
 }
@@ -109,7 +120,7 @@ export class Component_Render extends HyperRender<ComponentGenerator, Element | 
 export class HTMLElement_Render extends HyperRender<keyof HTMLElementTagNameMap, ValuesOf<HTMLElementTagNameMap>> {
 	test(tag: any, props?: any): boolean { return typeof tag === "string" }
 
-	h<TAG extends keyof HTMLElementTagNameMap>(tag: TAG, props?: null | { [attr: string]: any }, ...children: (string | Node)[]): HTMLElementTagNameMap[TAG] {
+	h<TAG extends keyof HTMLElementTagNameMap>(tag: TAG, props?: null | AttrProps, ...children: (string | Node)[]): HTMLElementTagNameMap[TAG] {
 		props ??= {}
 		const element = document.createElement(tag)
 		for (const [attr_name, attr_value] of object_entries(props)) {
@@ -126,7 +137,7 @@ export class HTMLElement_Render extends HyperRender<keyof HTMLElementTagNameMap,
 export class SVGElement_Render extends HyperRender<keyof SVGElementTagNameMap, ValuesOf<SVGElementTagNameMap>> {
 	test(tag: any, props?: any): boolean { return typeof tag === "string" }
 
-	h<TAG extends keyof SVGElementTagNameMap>(tag: TAG, props?: null | { [attr: string]: any }, ...children: (string | Node)[]): SVGElementTagNameMap[TAG] {
+	h<TAG extends keyof SVGElementTagNameMap>(tag: TAG, props?: null | AttrProps, ...children: (string | Node)[]): SVGElementTagNameMap[TAG] {
 		props ??= {}
 		const element = document.createElementNS("http://www.w3.org/2000/svg", tag)
 		for (const [attr_name, attr_value] of object_entries(props)) {
