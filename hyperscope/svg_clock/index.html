@@ -5,13 +5,22 @@
 	<meta charset="utf-8" />
 	<meta name="viewport" content="width=device-width, initial-scale=1.0" />
 	<title>svg clock</title>
+	<script>
+		globalThis.addEventListener("DOMContentLoaded", async () => {
+			const { getTime, idTime, setTime } = await import("./index.tsx")
+		})
+	</script>
 	<style>
-		.clock {
+		body {
 			display: flex;
-			justify-content: center;
+			justify-content: space-evenly;
 			align-items: center;
 			flex-wrap: wrap;
-			height: 100vh;
+		}
+
+		img {
+			width: calc(min(300px, 28vmin));
+			object-fit: contain;
 		}
 
 		.subsecond {
@@ -27,15 +36,8 @@
 			color: tomato;
 		}
 	</style>
-	<script>
-		globalThis.addEventListener("DOMContentLoaded", async () => {
-			const { } = await import("./index.tsx")
-		})
-	</script>
-
-	<style></style>
 </head>
 
-<body id="root" style="width: 100vw; height: 100vh;"></body>
+<body id="root" style="width: 98vw; height: 98vh;"></body>
 
 </html>
