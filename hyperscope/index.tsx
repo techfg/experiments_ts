@@ -3,22 +3,27 @@
 
 import { Context, MemoSignal_Factory, StateSignal_Factory } from "jsr:@oazmi/tsignal"
 import { bindMethodToSelfByName } from "./deps.ts"
-import { ATTRS, EVENTS, Fragment, HTMLElement_Render, HyperScope, SVGElement_Render } from "./mod.ts"
-import { ReactiveComponent_Render_Factory, ReactiveFragment_Render_Factory } from "./signal.ts"
+import { ATTRS, EVENTS, Fragment, HyperScope } from "./mod.ts"
+import { ReactiveComponent_Render_Factory, ReactiveFragment_Render_Factory, ReactiveHTMLElement_Render_Factory, ReactiveSVGElement_Render_Factory } from "./signal.ts"
 
-const ctx = new Context()
-const createState = ctx.addClass(StateSignal_Factory)
-const createMemo = ctx.addClass(MemoSignal_Factory)
-const ReactiveFragment_Render = ReactiveFragment_Render_Factory(ctx)
-const ReactiveComponent_Render = ReactiveComponent_Render_Factory(ctx)
+const
+	ctx = new Context(),
+	createState = ctx.addClass(StateSignal_Factory),
+	createMemo = ctx.addClass(MemoSignal_Factory)
+
+const
+	ReactiveFragment_Render = ReactiveFragment_Render_Factory(ctx),
+	ReactiveComponent_Render = ReactiveComponent_Render_Factory(ctx),
+	ReactiveHTMLElement_Render = ReactiveHTMLElement_Render_Factory(ctx),
+	ReactiveSVGElement_Render = ReactiveSVGElement_Render_Factory(ctx)
 
 
 const hyperscope = new HyperScope(
 	new ReactiveFragment_Render("reactive fragment component jsx renderer"),
 	new ReactiveComponent_Render("reactive component jsx renderer"),
-	new HTMLElement_Render("html jsx renderer"),
+	new ReactiveHTMLElement_Render("reactive html jsx renderer"),
 )
-const svg_renderer = hyperscope.addClass(SVGElement_Render)
+const svg_renderer = hyperscope.addClass(ReactiveSVGElement_Render, "reactive svg jsx renderer")
 const SVG_SCOPE = svg_renderer.kind
 
 const h = bindMethodToSelfByName(hyperscope, "h")
@@ -39,7 +44,7 @@ const MyDiv = ({ width = 100, height = 50 } = {}) => {
 		</g></svg>
 		{popScope()}
 		<>
-			{getTime}
+			<span>{getTime}</span>
 			<span>ZA</span>
 			<span>WARUDO!</span>
 			<button {...{

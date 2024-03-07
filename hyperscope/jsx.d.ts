@@ -22,9 +22,6 @@ interface Attributes {
 
 type IntrinsicHTMLElements = { [tagName in keyof HTMLElementTagNameMap]: Attributes }
 type IntrinsicSVGElements = { [tagName in keyof SVGElementTagNameMap]: Attributes }
+export type IntrinsicElements = IntrinsicHTMLElements & IntrinsicSVGElements
 
-declare global {
-	export namespace JSX {
-		export type IntrinsicElements = IntrinsicHTMLElements & IntrinsicSVGElements
-	}
-}
+export as namespace JSX

@@ -66,7 +66,7 @@
  * @module
 */
 
-import { ConstructorOf, array_isArray, bind_array_pop, bind_array_push, bind_map_get, bind_stack_seek, isFunction, object_entries } from "./deps.ts"
+import { ConstructorOf, array_isArray, bind_array_pop, bind_array_push, bind_map_get, bind_stack_seek, console_error, isFunction, object_entries } from "./deps.ts"
 
 
 export type RenderKind = symbol
@@ -105,8 +105,8 @@ export interface DefaultProps {
 
 export type Props<P = {}> = P & DefaultProps
 
-export type SingleComponentGenerator<P = {}> = (props?: Props<P>) => Element
-export type FragmentComponentGenerator<P = {}> = (props?: P) => (string | Element)[]
+export type SingleComponentGenerator<P = {}> = (props: Props<P>) => Element
+export type FragmentComponentGenerator<P = {}> = (props: P) => (string | Element)[]
 export type ComponentGenerator<P = {}> = SingleComponentGenerator<P> | FragmentComponentGenerator<P>
 
 export class Component_Render<G extends ComponentGenerator = ComponentGenerator> extends HyperRender<G> {
@@ -136,10 +136,21 @@ export class Component_Render<G extends ComponentGenerator = ComponentGenerator>
 		return component_node
 	}
 
-	protected addAttr(element: Element, attribute_name: string, attribute_value: any): void {
-		const attr = document.createAttribute(attribute_name)
+	protected addAttr(element: Element, attribute_node: Attr): void
+	protected addAttr(element: Element, attribute_name: string, attribute_value: any): void
+	protected addAttr(element: Element, attribute: Attr | string, attribute_value?: any): void
+	protected addAttr(element: Element, attribute: Attr | string, attribute_value?: any): void {
+		const
+			existing_node = attribute instanceof Attr,
+			attr = existing_node ? attribute : document.createAttribute(attribute)
 		attr.nodeValue = attribute_value
-		element.setAttributeNode(attr)
+		if (!existing_node) {
+			// we only add the attribute if it was not an existing node.
+			// this is because if it was the child of a different element, then this would cause a DOM error.
+			// therefore, it is up to the creator of the attribute_node to handle appending it to the desired element.
+			element.setAttributeNode(attr)
+		}
+		// element.setAttribute(attribute_name, attribute_value) // equivalent shorter code. but not sure if I should use it
 	}
 
 	protected addEvent(
@@ -156,7 +167,7 @@ export class Component_Render<G extends ComponentGenerator = ComponentGenerator>
 	}
 }
 
-const normalizeElementProps = (props?: null | Props<AttrProps>): Props<{}> => {
+export const normalizeElementProps = (props?: null | Props<AttrProps>): Props<{}> => {
 	const {
 		[EVENTS]: event_props,
 		[ADVANCED_EVENTS]: advanced_events_props,
@@ -180,6 +191,9 @@ export class HTMLElement_Render extends Component_Render<typeof HTMLTagComponent
 	}
 }
 
+export const
+	svg_case_sensitive_attrs = ["viewBox", "preserveAspectRatio", "xmlns"],
+	svg_case_sensitive_attrs_lower = svg_case_sensitive_attrs.map((attr_name) => attr_name.toLowerCase())
 export const SVGTagComponent = <TAG extends keyof SVGElementTagNameMap = any>(props?: Props<{ tag?: TAG }>): SVGElementTagNameMap[TAG] => document.createElementNS("http://www.w3.org/2000/svg", props!.tag!)
 export class SVGElement_Render extends Component_Render<typeof SVGTagComponent> {
 	test(tag: any, props?: any): boolean { return typeof tag === "string" }
@@ -187,6 +201,22 @@ export class SVGElement_Render extends Component_Render<typeof SVGTagComponent> 
 	// @ts-ignore: we are breaking subclassing inheritance rules by having `tag: string` as the first argument instead of `component: ComponentGenerator`
 	h<TAG extends keyof SVGElementTagNameMap>(tag: TAG, props?: null | Props<AttrProps>, ...children: (string | Node)[]): SVGElementTagNameMap[TAG] {
 		return super.h(SVGTagComponent, { tag, ...normalizeElementProps(props) }, ...children) as SVGElementTagNameMap[TAG]
+	}
+
+	protected addAttr(element: Element, attribute_node: Attr): void
+	protected addAttr(element: Element, attribute_name: string, attribute_value: any): void
+	protected addAttr(element: Element, attribute: Attr | string, attribute_value?: any): void
+	protected addAttr(element: Element, attribute: Attr | string, attribute_value?: any): void {
+		// svg attributes are case sensitive, most notably the "viewBox" and "preserveAspectRatio" attributes must have the exact casing.
+		// unfortunately, when we create attribute nodes using `document.createAttribute(attribute_name)`, like done in the super method,
+		// we lose the original casing, and everything becomes lower cased. so, we must instead use
+		//`element.setAttribute(attribute_name, attribute_value)` to preserve the original case.
+		const case_sensitive_attr_name_index = attribute instanceof Attr ? -1 : svg_case_sensitive_attrs_lower.indexOf(attribute)
+		if (case_sensitive_attr_name_index >= 0) {
+			element.setAttribute(svg_case_sensitive_attrs[case_sensitive_attr_name_index], attribute_value)
+		} else {
+			super.addAttr(element, attribute, attribute_value)
+		}
 	}
 }
 
@@ -219,6 +249,7 @@ export class HyperScope extends HyperRender<any, any> {
 
 	constructor(...default_scope: HyperRender[]) {
 		super("hyperscope rederer")
+		default_scope.forEach((renderer) => { this.addRenderer(renderer) })
 		const
 			scope_stack: Array<HyperRender[]> = [],
 			scope_stack_push = bind_array_push(scope_stack),
@@ -226,7 +257,7 @@ export class HyperScope extends HyperRender<any, any> {
 			scope_stack_seek = bind_stack_seek(scope_stack),
 			all_renderers_map_get = bind_map_get(this.renderers)
 		this.pushScope = (...renderers: RenderKind[]): typeof PushScope => {
-			scope_stack_push(renderers.map((scope) => all_renderers_map_get(scope)!))
+			scope_stack_push(renderers.map((renderer) => all_renderers_map_get(renderer)!))
 			return PushScope
 		}
 		this.popScope = (): typeof PopScope => {
@@ -240,8 +271,12 @@ export class HyperScope extends HyperRender<any, any> {
 
 	addClass<CLS extends ConstructorOf<HyperRender, ARGS>, ARGS extends any[]>(renderer_class: CLS, ...args: ARGS): InstanceType<CLS> {
 		const renderer = new renderer_class(...args)
-		this.renderers.set(renderer.kind, renderer)
+		this.addRenderer(renderer)
 		return renderer as any
+	}
+
+	addRenderer<R extends HyperRender>(renderer: R) {
+		this.renderers.set(renderer.kind, renderer)
 	}
 
 	test(tag: any, props?: any): boolean {
@@ -257,10 +292,14 @@ export class HyperScope extends HyperRender<any, any> {
 	h(tag: any, props: any, ...children: HyperScopeChildren): Element
 	h(tag: any, props: any, ...children: HyperScopeChildren): undefined | Element | Element[] {
 		for (const renderer of this.seekScope()) {
+			if (renderer === undefined) {
+				console_error("supposed renderer was not registered (its kind symbol is not registered)")
+			}
 			if (renderer.test(tag, props)) {
 				const flat_children = children.flat(1).filter(node_only_child_filter)
 				return renderer.h(tag, props, ...flat_children)
 			}
 		}
+		console_error("failed to capture an appropriate renderer")
 	}
 }
