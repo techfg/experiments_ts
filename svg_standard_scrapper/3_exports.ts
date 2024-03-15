@@ -1,0 +1,153 @@
+/** generated via: https://github.com/omar-azmi/experiments_ts/svg_standard_scrapper/3_create_typescript_definitions.ts */
+
+type Stylable =
+	| "style"
+	| "class"
+	| "alignment-baseline"
+	| "writing-mode"
+	| "clip-path"
+	| "clip-rule"
+	| "color"
+	| "color-interpolation"
+	| "color-interpolation-filters"
+	| "color-rendering"
+	| "cursor"
+	| "direction"
+	| "display"
+	| "dominant-baseline"
+	| "fill"
+	| "fill-opacity"
+	| "fill-rule"
+	| "filter"
+	| "flood-color"
+	| "flood-opacity"
+	| "font-family"
+	| "font-size"
+	| "font-size-adjust"
+	| "font-stretch"
+	| "font-style"
+	| "font-variant"
+	| "font-weight"
+	| "image-rendering"
+	| "letter-spacing"
+	| "baseline-shift"
+	| "marker-end"
+	| "marker-mid"
+	| "marker-start"
+	| "mask"
+	| "opacity"
+	| "overflow"
+	| "pointer-events"
+	| "shape-rendering"
+	| "solid-color"
+	| "solid-opacity"
+	| "stop-color"
+	| "stop-opacity"
+	| "stroke"
+	| "stroke-dasharray"
+	| "stroke-dashoffset"
+	| "stroke-linecap"
+	| "stroke-linejoin"
+	| "stroke-miterlimit"
+	| "stroke-opacity"
+	| "stroke-width"
+	| "text-anchor"
+	| "text-decoration"
+	| "text-rendering"
+	| "transform"
+	| "unicode-bidi"
+	| "vector-effect"
+	| "visibility"
+	| "word-spacing"
+	| "lighting-color"
+type AriaSupport = "role" | "`aria-${string}`"
+type Common = "id" | "lang" | "tabindex"
+type LanguageAndExtension = "requiredExtensions" | "systemLanguage"
+type FeCommon1 = "height" | "in" | "result" | "width" | "x" | "y"
+type FeCommon2 = "height" | "result" | "width" | "x" | "y"
+type FeFunc = "amplitude" | "exponent" | "intercept" | "offset" | "tableValues" | "type"
+type AnimationSupport1 = "begin" | "dur" | "end" | "fill" | "href" | "max" | "min" | "repeatCount" | "repeatDur" | "restart"
+type AnimationSupport2 = "accumulate" | "additive" | "by" | "calcMode" | "from" | "keySplines" | "keyTimes" | "to" | "values"
+type BoxViewAble = "preserveAspectRatio" | "viewBox"
+type Rect = "height" | "width" | "x" | "y"
+type LineSegment = "x1" | "x2" | "y1" | "y2"
+type TextOptions = "lengthAdjust" | "textLength"
+
+export type SvgTagAttributes = {
+	animate: Common | LanguageAndExtension | AnimationSupport1 | AnimationSupport2 | "attributeName"
+	animateMotion: Common | LanguageAndExtension | AnimationSupport1 | AnimationSupport2 | "keyPoints" | "origin" | "path" | "rotate"
+	animateTransform: Common | LanguageAndExtension | AnimationSupport1 | AnimationSupport2 | "attributeName" | "type"
+	feFuncA: Common | FeFunc
+	feFuncB: Common | FeFunc
+	feFuncG: Common | FeFunc
+	feFuncR: Common | FeFunc
+	set: Common | LanguageAndExtension | AnimationSupport1 | "attributeName" | "to"
+	feDistantLight: Common | "azimuth" | "elevation"
+	feTurbulence: Stylable | Common | FeCommon2 | "baseFrequency" | "numOctaves" | "seed" | "stitchTiles" | "type"
+	discard: Common | LanguageAndExtension | "begin" | "href"
+	feConvolveMatrix: Stylable | Common | FeCommon1 | "bias" | "divisor" | "edgeMode" | "kernelMatrix" | "kernelUnitLength" | "order" | "preserveAlpha" | "targetX" | "targetY"
+	a: Stylable | Common | LanguageAndExtension | "download" | "href" | "hreflang" | "rel" | "target" | "type"
+	audio: Stylable | Common | LanguageAndExtension
+	canvas: Stylable | Common | LanguageAndExtension | "preserveAspectRatio"
+	circle: Stylable | Common | LanguageAndExtension | "pathLength"
+	clipPath: Stylable | Common | LanguageAndExtension | "clipPathUnits"
+	defs: Stylable | Common
+	desc: Stylable | Common
+	ellipse: Stylable | Common | LanguageAndExtension | "pathLength"
+	feBlend: Stylable | Common | FeCommon1 | "in2" | "mode"
+	feColorMatrix: Stylable | Common | FeCommon1 | "type" | "values"
+	feComponentTransfer: Stylable | Common | FeCommon1
+	feComposite: Stylable | Common | FeCommon1 | "in2" | "k1" | "k2" | "k3" | "k4" | "operator"
+	feDiffuseLighting: Stylable | Common | FeCommon1 | "diffuseConstant" | "kernelUnitLength" | "surfaceScale"
+	feDisplacementMap: Stylable | Common | FeCommon1 | "in2" | "scale" | "xChannelSelector" | "yChannelSelector"
+	feDropShadow: Stylable | Common | FeCommon1 | "dx" | "dy" | "stdDeviation"
+	feFlood: Stylable | Common | FeCommon2
+	feGaussianBlur: Stylable | Common | FeCommon1 | "edgeMode" | "stdDeviation"
+	feImage: Stylable | Common | FeCommon2 | "crossorigin" | "href" | "preserveAspectRatio"
+	feMerge: Stylable | Common | FeCommon2
+	feMorphology: Stylable | Common | FeCommon1 | "operator" | "radius"
+	feOffset: Stylable | Common | FeCommon1 | "dx" | "dy"
+	feSpecularLighting: Stylable | Common | FeCommon1 | "kernelUnitLength" | "specularConstant" | "specularExponent" | "surfaceScale"
+	feTile: Stylable | Common | FeCommon1
+	filter: Stylable | Common | Rect | "filterUnits" | "primitiveUnits"
+	foreignObject: Stylable | Common | LanguageAndExtension
+	g: Stylable | Common | LanguageAndExtension
+	hatch: Stylable | Common | "hatchContentUnits" | "hatchUnits" | "href" | "pitch" | "rotate" | "transform" | "x" | "y"
+	hatchpath: Stylable | Common | "d" | "offset"
+	iframe: Stylable | Common | LanguageAndExtension
+	image: Stylable | Common | LanguageAndExtension | "crossorigin" | "href" | "preserveAspectRatio"
+	line: Stylable | Common | LanguageAndExtension | LineSegment | "pathLength"
+	linearGradient: Stylable | Common | LineSegment | "gradientTransform" | "gradientUnits" | "href" | "spreadMethod"
+	marker: Stylable | Common | BoxViewAble | "markerHeight" | "markerUnits" | "markerWidth" | "orient" | "refX" | "refY"
+	mask: Stylable | Common | LanguageAndExtension | Rect | "maskContentUnits" | "maskUnits"
+	meshgradient: Stylable | Common | "gradientUnits" | "href" | "transform" | "type" | "x" | "y"
+	meshpatch: Stylable | Common
+	meshrow: Stylable | Common
+	path: Stylable | Common | LanguageAndExtension | "pathLength"
+	pattern: Stylable | Common | BoxViewAble | Rect | "href" | "patternContentUnits" | "patternTransform" | "patternUnits"
+	polygon: Stylable | Common | LanguageAndExtension | "pathLength" | "points"
+	polyline: Stylable | Common | LanguageAndExtension | "pathLength" | "points"
+	radialGradient: Stylable | Common | "cx" | "cy" | "fr" | "fx" | "fy" | "gradientTransform" | "gradientUnits" | "href" | "r" | "spreadMethod"
+	rect: Stylable | Common | LanguageAndExtension | "pathLength"
+	solidcolor: Stylable | Common
+	stop: Stylable | Common | "offset" | "path"
+	svg: Stylable | Common | LanguageAndExtension | BoxViewAble | "playbackorder" | "timelinebegin" | "transform"
+	switch: Stylable | Common | LanguageAndExtension
+	symbol: Stylable | Common | BoxViewAble | "refX" | "refY"
+	text: Stylable | Common | LanguageAndExtension | TextOptions | "dx" | "dy" | "rotate" | "x" | "y"
+	textPath: Stylable | Common | LanguageAndExtension | TextOptions | "href" | "method" | "path" | "side" | "spacing" | "startOffset"
+	title: Stylable | Common
+	tspan: Stylable | Common | LanguageAndExtension | TextOptions | "dx" | "dy" | "rotate" | "x" | "y"
+	unknown: Stylable | Common | LanguageAndExtension
+	use: Stylable | Common | LanguageAndExtension | "href"
+	video: Stylable | Common | LanguageAndExtension
+	script: Common | "crossorigin" | "href" | "type"
+	mesh: Common | LanguageAndExtension | "href"
+	mpath: Common | "href"
+	feMergeNode: Common | "in"
+	fePointLight: Common | "x" | "y" | "z"
+	feSpotLight: Common | "limitingConeAngle" | "pointsAtX" | "pointsAtY" | "pointsAtZ" | "specularExponent" | "x" | "y" | "z"
+	metadata: Common
+	style: Common | "media" | "title" | "type"
+	view: Common | BoxViewAble
+}
