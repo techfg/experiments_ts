@@ -21,7 +21,7 @@ const svgCommonAttributeGroups_Types = Object.entries(svgCommonAttributeGroups)
 	})
 	.join("\n")
 
-const svgTagSupportedAttributes_Types = "export type SvgTagAttributes = {\n" + Object.entries(svgTagSupportedAttributes)
+const svgTagSupportedAttributes_Types = "export type SVGTagNameAttributesMap = {\n" + Object.entries(svgTagSupportedAttributes)
 	.map(([tag_name, entry]) => {
 		return tag_name + " : " + unionizeEntryOfTagSupportedAttributes(entry as any)
 	})

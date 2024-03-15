@@ -1,9 +1,12 @@
 /** generated via: https://github.com/omar-azmi/experiments_ts/svg_standard_scrapper/2_scrape_tag_attribute_pairs.ts */
 
 export const svgCommonAttributeGroups = {
-	"Stylable": [
-		"style",
-		"class",
+	"Stylable": ["style", "class"],
+	"AriaSupport": ["role", "`aria-${string}`"],
+	"Common": [
+		"id",
+		"lang",
+		"tabindex",
 		"alignment-baseline",
 		"writing-mode",
 		"clip-path",
@@ -62,8 +65,6 @@ export const svgCommonAttributeGroups = {
 		"word-spacing",
 		"lighting-color",
 	],
-	"AriaSupport": ["role", "`aria-${string}`"],
-	"Common": ["id", "lang", "tabindex"],
 	"LanguageAndExtension": ["requiredExtensions", "systemLanguage"],
 	"FeCommon1": ["height", "in", "result", "width", "x", "y"],
 	"FeCommon2": ["height", "result", "width", "x", "y"],
@@ -77,49 +78,28 @@ export const svgCommonAttributeGroups = {
 }
 export const svgTagSupportedAttributes = {
 	"animate": {
-		"groups": [
-			"Common",
-			"LanguageAndExtension",
-			"AnimationSupport1",
-			"AnimationSupport2",
-		],
+		"groups": ["Common", "LanguageAndExtension", "AnimationSupport1", "AnimationSupport2"],
 		"attrs": ["attributeName"],
 	},
 	"animateMotion": {
-		"groups": [
-			"Common",
-			"LanguageAndExtension",
-			"AnimationSupport1",
-			"AnimationSupport2",
-		],
+		"groups": ["Common", "LanguageAndExtension", "AnimationSupport1", "AnimationSupport2"],
 		"attrs": ["keyPoints", "origin", "path", "rotate"],
 	},
 	"animateTransform": {
-		"groups": [
-			"Common",
-			"LanguageAndExtension",
-			"AnimationSupport1",
-			"AnimationSupport2",
-		],
+		"groups": ["Common", "LanguageAndExtension", "AnimationSupport1", "AnimationSupport2"],
 		"attrs": ["attributeName", "type"],
 	},
 	"feFuncA": { "groups": ["Common", "FeFunc"], "attrs": [] },
 	"feFuncB": { "groups": ["Common", "FeFunc"], "attrs": [] },
 	"feFuncG": { "groups": ["Common", "FeFunc"], "attrs": [] },
 	"feFuncR": { "groups": ["Common", "FeFunc"], "attrs": [] },
-	"set": {
-		"groups": ["Common", "LanguageAndExtension", "AnimationSupport1"],
-		"attrs": ["attributeName", "to"],
-	},
+	"set": { "groups": ["Common", "LanguageAndExtension", "AnimationSupport1"], "attrs": ["attributeName", "to"] },
 	"feDistantLight": { "groups": ["Common"], "attrs": ["azimuth", "elevation"] },
 	"feTurbulence": {
 		"groups": ["Stylable", "Common", "FeCommon2"],
 		"attrs": ["baseFrequency", "numOctaves", "seed", "stitchTiles", "type"],
 	},
-	"discard": {
-		"groups": ["Common", "LanguageAndExtension"],
-		"attrs": ["begin", "href"],
-	},
+	"discard": { "groups": ["Common", "LanguageAndExtension"], "attrs": ["begin", "href"] },
 	"feConvolveMatrix": {
 		"groups": ["Stylable", "Common", "FeCommon1"],
 		"attrs": [
@@ -138,40 +118,19 @@ export const svgTagSupportedAttributes = {
 		"groups": ["Stylable", "Common", "LanguageAndExtension"],
 		"attrs": ["download", "href", "hreflang", "rel", "target", "type"],
 	},
-	"audio": {
-		"groups": ["Stylable", "Common", "LanguageAndExtension"],
-		"attrs": [],
-	},
-	"canvas": {
-		"groups": ["Stylable", "Common", "LanguageAndExtension"],
-		"attrs": ["preserveAspectRatio"],
-	},
-	"circle": {
-		"groups": ["Stylable", "Common", "LanguageAndExtension"],
-		"attrs": ["pathLength"],
-	},
-	"clipPath": {
-		"groups": ["Stylable", "Common", "LanguageAndExtension"],
-		"attrs": ["clipPathUnits"],
-	},
+	"audio": { "groups": ["Stylable", "Common", "LanguageAndExtension"], "attrs": [] },
+	"canvas": { "groups": ["Stylable", "Common", "LanguageAndExtension"], "attrs": ["preserveAspectRatio"] },
+	"circle": { "groups": ["Stylable", "Common", "LanguageAndExtension"], "attrs": ["cx", "cy", "pathLength", "r"] },
+	"clipPath": { "groups": ["Stylable", "Common", "LanguageAndExtension"], "attrs": ["clipPathUnits"] },
 	"defs": { "groups": ["Stylable", "Common"], "attrs": [] },
 	"desc": { "groups": ["Stylable", "Common"], "attrs": [] },
 	"ellipse": {
 		"groups": ["Stylable", "Common", "LanguageAndExtension"],
-		"attrs": ["pathLength"],
+		"attrs": ["cx", "cy", "pathLength", "rx", "ry"],
 	},
-	"feBlend": {
-		"groups": ["Stylable", "Common", "FeCommon1"],
-		"attrs": ["in2", "mode"],
-	},
-	"feColorMatrix": {
-		"groups": ["Stylable", "Common", "FeCommon1"],
-		"attrs": ["type", "values"],
-	},
-	"feComponentTransfer": {
-		"groups": ["Stylable", "Common", "FeCommon1"],
-		"attrs": [],
-	},
+	"feBlend": { "groups": ["Stylable", "Common", "FeCommon1"], "attrs": ["in2", "mode"] },
+	"feColorMatrix": { "groups": ["Stylable", "Common", "FeCommon1"], "attrs": ["type", "values"] },
+	"feComponentTransfer": { "groups": ["Stylable", "Common", "FeCommon1"], "attrs": [] },
 	"feComposite": {
 		"groups": ["Stylable", "Common", "FeCommon1"],
 		"attrs": ["in2", "k1", "k2", "k3", "k4", "operator"],
@@ -184,90 +143,39 @@ export const svgTagSupportedAttributes = {
 		"groups": ["Stylable", "Common", "FeCommon1"],
 		"attrs": ["in2", "scale", "xChannelSelector", "yChannelSelector"],
 	},
-	"feDropShadow": {
-		"groups": ["Stylable", "Common", "FeCommon1"],
-		"attrs": ["dx", "dy", "stdDeviation"],
-	},
+	"feDropShadow": { "groups": ["Stylable", "Common", "FeCommon1"], "attrs": ["dx", "dy", "stdDeviation"] },
 	"feFlood": { "groups": ["Stylable", "Common", "FeCommon2"], "attrs": [] },
-	"feGaussianBlur": {
-		"groups": ["Stylable", "Common", "FeCommon1"],
-		"attrs": ["edgeMode", "stdDeviation"],
-	},
-	"feImage": {
-		"groups": ["Stylable", "Common", "FeCommon2"],
-		"attrs": ["crossorigin", "href", "preserveAspectRatio"],
-	},
+	"feGaussianBlur": { "groups": ["Stylable", "Common", "FeCommon1"], "attrs": ["edgeMode", "stdDeviation"] },
+	"feImage": { "groups": ["Stylable", "Common", "FeCommon2"], "attrs": ["crossorigin", "href", "preserveAspectRatio"] },
 	"feMerge": { "groups": ["Stylable", "Common", "FeCommon2"], "attrs": [] },
-	"feMorphology": {
-		"groups": ["Stylable", "Common", "FeCommon1"],
-		"attrs": ["operator", "radius"],
-	},
-	"feOffset": {
-		"groups": ["Stylable", "Common", "FeCommon1"],
-		"attrs": ["dx", "dy"],
-	},
+	"feMorphology": { "groups": ["Stylable", "Common", "FeCommon1"], "attrs": ["operator", "radius"] },
+	"feOffset": { "groups": ["Stylable", "Common", "FeCommon1"], "attrs": ["dx", "dy"] },
 	"feSpecularLighting": {
 		"groups": ["Stylable", "Common", "FeCommon1"],
-		"attrs": [
-			"kernelUnitLength",
-			"specularConstant",
-			"specularExponent",
-			"surfaceScale",
-		],
+		"attrs": ["kernelUnitLength", "specularConstant", "specularExponent", "surfaceScale"],
 	},
 	"feTile": { "groups": ["Stylable", "Common", "FeCommon1"], "attrs": [] },
-	"filter": {
-		"groups": ["Stylable", "Common", "Rect"],
-		"attrs": ["filterUnits", "primitiveUnits"],
-	},
-	"foreignObject": {
-		"groups": ["Stylable", "Common", "LanguageAndExtension"],
-		"attrs": [],
-	},
-	"g": {
-		"groups": ["Stylable", "Common", "LanguageAndExtension"],
-		"attrs": [],
-	},
+	"filter": { "groups": ["Stylable", "Common", "Rect"], "attrs": ["filterUnits", "primitiveUnits"] },
+	"foreignObject": { "groups": ["Stylable", "Common", "LanguageAndExtension", "Rect"], "attrs": [] },
+	"g": { "groups": ["Stylable", "Common", "LanguageAndExtension"], "attrs": [] },
 	"hatch": {
 		"groups": ["Stylable", "Common"],
-		"attrs": [
-			"hatchContentUnits",
-			"hatchUnits",
-			"href",
-			"pitch",
-			"rotate",
-			"transform",
-			"x",
-			"y",
-		],
+		"attrs": ["hatchContentUnits", "hatchUnits", "href", "pitch", "rotate", "transform", "x", "y"],
 	},
 	"hatchpath": { "groups": ["Stylable", "Common"], "attrs": ["d", "offset"] },
-	"iframe": {
-		"groups": ["Stylable", "Common", "LanguageAndExtension"],
-		"attrs": [],
-	},
+	"iframe": { "groups": ["Stylable", "Common", "LanguageAndExtension"], "attrs": [] },
 	"image": {
-		"groups": ["Stylable", "Common", "LanguageAndExtension"],
+		"groups": ["Stylable", "Common", "LanguageAndExtension", "Rect"],
 		"attrs": ["crossorigin", "href", "preserveAspectRatio"],
 	},
-	"line": {
-		"groups": ["Stylable", "Common", "LanguageAndExtension", "LineSegment"],
-		"attrs": ["pathLength"],
-	},
+	"line": { "groups": ["Stylable", "Common", "LanguageAndExtension", "LineSegment"], "attrs": ["pathLength"] },
 	"linearGradient": {
 		"groups": ["Stylable", "Common", "LineSegment"],
 		"attrs": ["gradientTransform", "gradientUnits", "href", "spreadMethod"],
 	},
 	"marker": {
 		"groups": ["Stylable", "Common", "BoxViewAble"],
-		"attrs": [
-			"markerHeight",
-			"markerUnits",
-			"markerWidth",
-			"orient",
-			"refX",
-			"refY",
-		],
+		"attrs": ["markerHeight", "markerUnits", "markerWidth", "orient", "refX", "refY"],
 	},
 	"mask": {
 		"groups": ["Stylable", "Common", "LanguageAndExtension", "Rect"],
@@ -279,60 +187,26 @@ export const svgTagSupportedAttributes = {
 	},
 	"meshpatch": { "groups": ["Stylable", "Common"], "attrs": [] },
 	"meshrow": { "groups": ["Stylable", "Common"], "attrs": [] },
-	"path": {
-		"groups": ["Stylable", "Common", "LanguageAndExtension"],
-		"attrs": ["pathLength"],
-	},
+	"path": { "groups": ["Stylable", "Common", "LanguageAndExtension"], "attrs": ["d", "pathLength"] },
 	"pattern": {
 		"groups": ["Stylable", "Common", "BoxViewAble", "Rect"],
-		"attrs": [
-			"href",
-			"patternContentUnits",
-			"patternTransform",
-			"patternUnits",
-		],
+		"attrs": ["href", "patternContentUnits", "patternTransform", "patternUnits"],
 	},
-	"polygon": {
-		"groups": ["Stylable", "Common", "LanguageAndExtension"],
-		"attrs": ["pathLength", "points"],
-	},
-	"polyline": {
-		"groups": ["Stylable", "Common", "LanguageAndExtension"],
-		"attrs": ["pathLength", "points"],
-	},
+	"polygon": { "groups": ["Stylable", "Common", "LanguageAndExtension"], "attrs": ["pathLength", "points"] },
+	"polyline": { "groups": ["Stylable", "Common", "LanguageAndExtension"], "attrs": ["pathLength", "points"] },
 	"radialGradient": {
 		"groups": ["Stylable", "Common"],
-		"attrs": [
-			"cx",
-			"cy",
-			"fr",
-			"fx",
-			"fy",
-			"gradientTransform",
-			"gradientUnits",
-			"href",
-			"r",
-			"spreadMethod",
-		],
+		"attrs": ["cx", "cy", "fr", "fx", "fy", "gradientTransform", "gradientUnits", "href", "r", "spreadMethod"],
 	},
-	"rect": {
-		"groups": ["Stylable", "Common", "LanguageAndExtension"],
-		"attrs": ["pathLength"],
-	},
+	"rect": { "groups": ["Stylable", "Common", "LanguageAndExtension", "Rect"], "attrs": ["pathLength", "rx", "ry"] },
 	"solidcolor": { "groups": ["Stylable", "Common"], "attrs": [] },
 	"stop": { "groups": ["Stylable", "Common"], "attrs": ["offset", "path"] },
 	"svg": {
-		"groups": ["Stylable", "Common", "LanguageAndExtension", "BoxViewAble"],
+		"groups": ["Stylable", "Common", "LanguageAndExtension", "BoxViewAble", "Rect"],
 		"attrs": ["playbackorder", "timelinebegin", "transform"],
 	},
-	"switch": {
-		"groups": ["Stylable", "Common", "LanguageAndExtension"],
-		"attrs": [],
-	},
-	"symbol": {
-		"groups": ["Stylable", "Common", "BoxViewAble"],
-		"attrs": ["refX", "refY"],
-	},
+	"switch": { "groups": ["Stylable", "Common", "LanguageAndExtension"], "attrs": [] },
+	"symbol": { "groups": ["Stylable", "Common", "BoxViewAble", "Rect"], "attrs": ["refX", "refY"] },
 	"text": {
 		"groups": ["Stylable", "Common", "LanguageAndExtension", "TextOptions"],
 		"attrs": ["dx", "dy", "rotate", "x", "y"],
@@ -346,18 +220,9 @@ export const svgTagSupportedAttributes = {
 		"groups": ["Stylable", "Common", "LanguageAndExtension", "TextOptions"],
 		"attrs": ["dx", "dy", "rotate", "x", "y"],
 	},
-	"unknown": {
-		"groups": ["Stylable", "Common", "LanguageAndExtension"],
-		"attrs": [],
-	},
-	"use": {
-		"groups": ["Stylable", "Common", "LanguageAndExtension"],
-		"attrs": ["href"],
-	},
-	"video": {
-		"groups": ["Stylable", "Common", "LanguageAndExtension"],
-		"attrs": [],
-	},
+	"unknown": { "groups": ["Stylable", "Common", "LanguageAndExtension"], "attrs": [] },
+	"use": { "groups": ["Stylable", "Common", "LanguageAndExtension", "Rect"], "attrs": ["href"] },
+	"video": { "groups": ["Stylable", "Common", "LanguageAndExtension"], "attrs": [] },
 	"script": { "groups": ["Common"], "attrs": ["crossorigin", "href", "type"] },
 	"mesh": { "groups": ["Common", "LanguageAndExtension"], "attrs": ["href"] },
 	"mpath": { "groups": ["Common"], "attrs": ["href"] },
@@ -365,16 +230,7 @@ export const svgTagSupportedAttributes = {
 	"fePointLight": { "groups": ["Common"], "attrs": ["x", "y", "z"] },
 	"feSpotLight": {
 		"groups": ["Common"],
-		"attrs": [
-			"limitingConeAngle",
-			"pointsAtX",
-			"pointsAtY",
-			"pointsAtZ",
-			"specularExponent",
-			"x",
-			"y",
-			"z",
-		],
+		"attrs": ["limitingConeAngle", "pointsAtX", "pointsAtY", "pointsAtZ", "specularExponent", "x", "y", "z"],
 	},
 	"metadata": { "groups": ["Common"], "attrs": [] },
 	"style": { "groups": ["Common"], "attrs": ["media", "title", "type"] },

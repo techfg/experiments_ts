@@ -3,30 +3,49 @@
  * this script gathers all svg attributes, and distribute it among the tag names,
  * while also keeping a short list of common attribute groups supported by many tags together,
  * so as to create a shorter list of more unique attributes supported by each tag.
+ * 
+ * DONE: ~TODO: make a separate script to scrape geomentry properties: "https://svgwg.org/svg-next/geometry.html"~ <br>
+ * DONE: ~also, you are missing "transform" for the "g" element, you must be missing other stuff that is elsewhere~ <br>
+ * DONE: ~also check this out: "https://svgwg.org/svg-next/idl.html" it might be easier to parse it~ <br>
 */
-
-// TODO make a separate script to scrape geomentry properties: https://svgwg.org/svg-next/geometry.html
-// also, you are missing "transform" for the "g" element, you must be missing other stuff that is elsewhere
-// also check this out: "https://svgwg.org/svg-next/idl.html" it might be easier to parse it
 
 import { svgDeprecatedAttributeNames, svgDeprecatedTagNames } from "./1_exports.ts"
 
-const string_sort_comparison = (a: string, b: string) => (a < b ? -1 : a > b ? 1 : 0)
-
-const attributes_table = document.querySelector("#RegularAttributes + * + table")!
 
 type AttributeSupportedTags = [attribute_name: string, supported_tags: string[]]
 
-const attr_supported_tags_dict_entries = [...attributes_table.querySelectorAll("tbody > tr")]
-	.map((attr_row) => {
-		const
-			attr_name = attr_row.querySelector(".attr-name")!.textContent!,
-			tag_names = [...attr_row.querySelectorAll(".element-name")]
-				.map((span_dom) => span_dom.textContent!)
-				// sort element tag names alphabetically
-				.sort(string_sort_comparison)
-				// filter out any deprecated tag names
-				.filter((tag_name) => !(svgDeprecatedTagNames.includes(tag_name)))
+const string_sort_comparison = (a: string, b: string) => (a < b ? -1 : a > b ? 1 : 0)
+const attributes_table = document.querySelector("#RegularAttributes + * + table")!
+const scrapped_attr_supported_tags = [...attributes_table.querySelectorAll("tbody > tr")].map((attr_row) => {
+	const
+		attr_name = attr_row.querySelector(".attr-name")!.textContent!,
+		tag_names = [...attr_row.querySelectorAll(".element-name")].map((span_dom) => span_dom.textContent!)
+	return [attr_name, tag_names] as AttributeSupportedTags
+}) satisfies Array<AttributeSupportedTags>
+/** these are taken from the following sources:
+ * - https://svgwg.org/svg-next/styling.html#TermPresentationAttribute
+ * - https://svgwg.org/svg-next/geometry.html
+*/
+const manuallyadded_attr_supported_tags = [
+	["d", ["path"]],
+	["cx", ["ellipse", "circle"]],
+	["cy", ["ellipse", "circle"]],
+	["r", ["circle"]],
+	["rx", ["ellipse", "rect"]],
+	["ry", ["ellipse", "rect"]],
+	["height", ["foreignObject", "image", "rect", "svg", "symbol", "use"]],
+	["width", ["foreignObject", "image", "rect", "svg", "symbol", "use"]],
+	["x", ["foreignObject", "image", "rect", "svg", "symbol", "use"]],
+	["y", ["foreignObject", "image", "rect", "svg", "symbol", "use"]],
+] satisfies Array<AttributeSupportedTags>
+
+const attr_supported_tags_dict_entries = [...manuallyadded_attr_supported_tags, ...scrapped_attr_supported_tags]
+	.map(([attr_name, tag_names]) => {
+		tag_names = tag_names
+			// sort element tag names alphabetically
+			.sort(string_sort_comparison)
+			// filter out any deprecated tag names
+			.filter((tag_name) => !(svgDeprecatedTagNames.includes(tag_name)))
 		return [attr_name, tag_names] as AttributeSupportedTags
 	})
 	// sort attribute names alphabetically
@@ -68,7 +87,7 @@ const svgCommonAttributeGroups = {
 	AnimationSupport1: ["begin", "dur", "end", "fill", "href", "max", "min", "repeatCount", "repeatDur", "restart"], // 4 tags implement these
 	AnimationSupport2: ["accumulate", "additive", "by", "calcMode", "from", "keySplines", "keyTimes", "to", "values"], // 3 tags implement these
 	BoxViewAble: ["preserveAspectRatio", "viewBox"], // 5 tags implement these
-	Rect: ["height", "width", "x", "y"], // 3 tags implement these
+	Rect: ["height", "width", "x", "y"], // 9 tags implement these
 	LineSegment: ["x1", "x2", "y1", "y2"], // 2 tags implement these
 	TextOptions: ["lengthAdjust", "textLength"], // 2 tags implement these
 } satisfies CommonAttributesSets
@@ -155,14 +174,14 @@ export type SvgTagSupportedAttributes = {
 }
 const svgTagSupportedAttributes: SvgTagSupportedAttributes = Object.fromEntries(tag_supported_attrs_entries)
 
-// now we inject "Presentation-Attributes" into the `Stylable` group of attributes,
-// because every stylable element can also have its styling components inlined as attributes.
-// these are known as presentation attributes
+// now we inject "Presentation-Attributes" into the `Common` group of attributes,
+// because every element can also have its styling components inlined as attributes.
+// these are known as presentation attributes.
 const presentation_attrs = [...document.querySelectorAll("#PresentationAttributes ~ span.attr-name")]
 	.map((attr_span_dom) => attr_span_dom.textContent!)
 	// remove deprecated attributes
 	.filter((attr_name) => !(svgDeprecatedAttributeNames.includes(attr_name)))
-svgCommonAttributeGroups.Stylable.push(...presentation_attrs)
+svgCommonAttributeGroups.Common.push(...presentation_attrs)
 
 const exports_ts = Object.entries({ svgCommonAttributeGroups, svgTagSupportedAttributes })
 	.map(([key, value]) => [key, JSON.stringify(value)])

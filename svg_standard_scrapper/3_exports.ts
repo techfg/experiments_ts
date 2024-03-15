@@ -1,8 +1,11 @@
 /** generated via: https://github.com/omar-azmi/experiments_ts/svg_standard_scrapper/3_create_typescript_definitions.ts */
 
-type Stylable =
-	| "style"
-	| "class"
+type Stylable = "style" | "class"
+type AriaSupport = "role" | "`aria-${string}`"
+type Common =
+	| "id"
+	| "lang"
+	| "tabindex"
 	| "alignment-baseline"
 	| "writing-mode"
 	| "clip-path"
@@ -60,8 +63,6 @@ type Stylable =
 	| "visibility"
 	| "word-spacing"
 	| "lighting-color"
-type AriaSupport = "role" | "`aria-${string}`"
-type Common = "id" | "lang" | "tabindex"
 type LanguageAndExtension = "requiredExtensions" | "systemLanguage"
 type FeCommon1 = "height" | "in" | "result" | "width" | "x" | "y"
 type FeCommon2 = "height" | "result" | "width" | "x" | "y"
@@ -73,7 +74,7 @@ type Rect = "height" | "width" | "x" | "y"
 type LineSegment = "x1" | "x2" | "y1" | "y2"
 type TextOptions = "lengthAdjust" | "textLength"
 
-export type SvgTagAttributes = {
+export type SVGTagNameAttributesMap = {
 	animate: Common | LanguageAndExtension | AnimationSupport1 | AnimationSupport2 | "attributeName"
 	animateMotion: Common | LanguageAndExtension | AnimationSupport1 | AnimationSupport2 | "keyPoints" | "origin" | "path" | "rotate"
 	animateTransform: Common | LanguageAndExtension | AnimationSupport1 | AnimationSupport2 | "attributeName" | "type"
@@ -89,11 +90,11 @@ export type SvgTagAttributes = {
 	a: Stylable | Common | LanguageAndExtension | "download" | "href" | "hreflang" | "rel" | "target" | "type"
 	audio: Stylable | Common | LanguageAndExtension
 	canvas: Stylable | Common | LanguageAndExtension | "preserveAspectRatio"
-	circle: Stylable | Common | LanguageAndExtension | "pathLength"
+	circle: Stylable | Common | LanguageAndExtension | "cx" | "cy" | "pathLength" | "r"
 	clipPath: Stylable | Common | LanguageAndExtension | "clipPathUnits"
 	defs: Stylable | Common
 	desc: Stylable | Common
-	ellipse: Stylable | Common | LanguageAndExtension | "pathLength"
+	ellipse: Stylable | Common | LanguageAndExtension | "cx" | "cy" | "pathLength" | "rx" | "ry"
 	feBlend: Stylable | Common | FeCommon1 | "in2" | "mode"
 	feColorMatrix: Stylable | Common | FeCommon1 | "type" | "values"
 	feComponentTransfer: Stylable | Common | FeCommon1
@@ -110,12 +111,12 @@ export type SvgTagAttributes = {
 	feSpecularLighting: Stylable | Common | FeCommon1 | "kernelUnitLength" | "specularConstant" | "specularExponent" | "surfaceScale"
 	feTile: Stylable | Common | FeCommon1
 	filter: Stylable | Common | Rect | "filterUnits" | "primitiveUnits"
-	foreignObject: Stylable | Common | LanguageAndExtension
+	foreignObject: Stylable | Common | LanguageAndExtension | Rect
 	g: Stylable | Common | LanguageAndExtension
 	hatch: Stylable | Common | "hatchContentUnits" | "hatchUnits" | "href" | "pitch" | "rotate" | "transform" | "x" | "y"
 	hatchpath: Stylable | Common | "d" | "offset"
 	iframe: Stylable | Common | LanguageAndExtension
-	image: Stylable | Common | LanguageAndExtension | "crossorigin" | "href" | "preserveAspectRatio"
+	image: Stylable | Common | LanguageAndExtension | Rect | "crossorigin" | "href" | "preserveAspectRatio"
 	line: Stylable | Common | LanguageAndExtension | LineSegment | "pathLength"
 	linearGradient: Stylable | Common | LineSegment | "gradientTransform" | "gradientUnits" | "href" | "spreadMethod"
 	marker: Stylable | Common | BoxViewAble | "markerHeight" | "markerUnits" | "markerWidth" | "orient" | "refX" | "refY"
@@ -123,23 +124,23 @@ export type SvgTagAttributes = {
 	meshgradient: Stylable | Common | "gradientUnits" | "href" | "transform" | "type" | "x" | "y"
 	meshpatch: Stylable | Common
 	meshrow: Stylable | Common
-	path: Stylable | Common | LanguageAndExtension | "pathLength"
+	path: Stylable | Common | LanguageAndExtension | "d" | "pathLength"
 	pattern: Stylable | Common | BoxViewAble | Rect | "href" | "patternContentUnits" | "patternTransform" | "patternUnits"
 	polygon: Stylable | Common | LanguageAndExtension | "pathLength" | "points"
 	polyline: Stylable | Common | LanguageAndExtension | "pathLength" | "points"
 	radialGradient: Stylable | Common | "cx" | "cy" | "fr" | "fx" | "fy" | "gradientTransform" | "gradientUnits" | "href" | "r" | "spreadMethod"
-	rect: Stylable | Common | LanguageAndExtension | "pathLength"
+	rect: Stylable | Common | LanguageAndExtension | Rect | "pathLength" | "rx" | "ry"
 	solidcolor: Stylable | Common
 	stop: Stylable | Common | "offset" | "path"
-	svg: Stylable | Common | LanguageAndExtension | BoxViewAble | "playbackorder" | "timelinebegin" | "transform"
+	svg: Stylable | Common | LanguageAndExtension | BoxViewAble | Rect | "playbackorder" | "timelinebegin" | "transform"
 	switch: Stylable | Common | LanguageAndExtension
-	symbol: Stylable | Common | BoxViewAble | "refX" | "refY"
+	symbol: Stylable | Common | BoxViewAble | Rect | "refX" | "refY"
 	text: Stylable | Common | LanguageAndExtension | TextOptions | "dx" | "dy" | "rotate" | "x" | "y"
 	textPath: Stylable | Common | LanguageAndExtension | TextOptions | "href" | "method" | "path" | "side" | "spacing" | "startOffset"
 	title: Stylable | Common
 	tspan: Stylable | Common | LanguageAndExtension | TextOptions | "dx" | "dy" | "rotate" | "x" | "y"
 	unknown: Stylable | Common | LanguageAndExtension
-	use: Stylable | Common | LanguageAndExtension | "href"
+	use: Stylable | Common | LanguageAndExtension | Rect | "href"
 	video: Stylable | Common | LanguageAndExtension
 	script: Common | "crossorigin" | "href" | "type"
 	mesh: Common | LanguageAndExtension | "href"
