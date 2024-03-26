@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+	<meta charset="utf-8" />
+	<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+	<title>monaco esbuild repl</title>
+	<link rel="stylesheet" href="./out/index.css">
+	<script type="module" src="./out/index.js"></script>
+	<script>
+		globalThis.addEventListener("DOMContentLoaded", async () => {
+			// await import("./out/index.js")
+		})
+	</script>
+	<style>
+		#monaco-editor {
+			position: absolute;
+			left: 0;
+			top: 0;
+			width: 100%;
+			height: 100%;
+			margin: 0;
+			padding: 0;
+			overflow: hidden;
+		}
+	</style>
+</head>
+
+<body style="width: 98vw; height: 98vh;">
+	<div id="monaco-editor"></div>
+	<div id="esbuild-output">
+		<!-- <iframe>placeholder for injected compiled iframes</iframe> -->
+	</div>
+</body>
+
+</html>
