@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title>WebSocket Client</title>
+</head>
+
+<body>
+	<h1>WebSocket Client</h1>
+	<button id="start">Start Download</button>
+	<p id="status">Status: Not started</p>
+	<script>
+		document.getElementById("start").onclick = function () {
+			const port = 8000
+			const socket = new WebSocket(`ws://localhost:${port}/downlink`)
+			// both "arraybuffer" and "blob" take about the same time to be processed.
+			// therefore, use whichever one is suitable for your programming pattern (i.e. if async, then go for blob, otherwise pick arraybuffer)
+			socket.binaryType = "arraybuffer"
+
+			socket.onopen = () => {
+				document.getElementById("status").textContent = "Status: Connected"
+			}
+
+			socket.onmessage = (event) => {
+				console.log("Receiving timestamp:", Date.now())
+				const data = new Uint8Array(event.data)
+				console.log(`Received "${data.length / (1024 ** 2)} mb" of TCP data from the server`)
+				document.getElementById("status").textContent = `Status: Received "${data.length / (1024 ** 2)} mb" of data`
+				// socket.close()
+			}
+
+			socket.onerror = (error) => {
+				console.error("WebSocket error:", error)
+				document.getElementById("status").textContent = "Status: Error occurred"
+			}
+
+			socket.onclose = () => {
+				document.getElementById("status").textContent = "Status: Connection closed"
+			}
+		}
+	</script>
+</body>
+
+</html>
