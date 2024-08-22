@@ -1,13 +1,10 @@
 import type { WsJsonMessage } from "./typedefs.ts"
 
-export const wsSendJson = (socket: WebSocket & { readyStatus: 1 }, message: WsJsonMessage) => {
-	socket.send(JSON.stringify(message))
-}
 
-export class WebSocketCommunicator<B extends ArrayBuffer | Blob = Blob> {
+export class Sock<B extends ArrayBuffer | Blob = Blob> {
 	socket: WebSocket
-	protected jsonReceivers: { [kind: string]: <M extends WsJsonMessage>(socket_communicator: WebSocketCommunicator<any>, message: M) => void } = {}
-	protected binaryReceivers: { [kind: string]: (socket_communicator: WebSocketCommunicator<B>, data: B) => void } = {}
+	protected jsonReceivers: { [kind: string]: <M extends WsJsonMessage>(sock: Sock<any>, message: M) => void } = {}
+	protected binaryReceivers: { [kind: string]: (sock: Sock<B>, data: B) => void } = {}
 	protected binaryReceiverNextKind?: string // keyof this["binaryReceivers"]
 
 	constructor(socket: WebSocket) {
@@ -34,11 +31,11 @@ export class WebSocketCommunicator<B extends ArrayBuffer | Blob = Blob> {
 		this.socket.send(data)
 	}
 
-	addJsonReceiver<M extends WsJsonMessage>(kind: string, handler: (socket_communicator: WebSocketCommunicator<any>, message: M) => void) {
+	addJsonReceiver<M extends WsJsonMessage>(kind: string, handler: (sock: Sock<any>, message: M) => void) {
 		this.jsonReceivers[kind] = handler as any
 	}
 
-	addBinaryReceiver(kind: string, handler: (socket_communicator: WebSocketCommunicator<B>, data: B) => void) {
+	addBinaryReceiver(kind: string, handler: (sock: Sock<B>, data: B) => void) {
 		this.binaryReceivers[kind] = handler
 	}
 
@@ -46,7 +43,7 @@ export class WebSocketCommunicator<B extends ArrayBuffer | Blob = Blob> {
 		this.binaryReceiverNextKind = kind
 	}
 
-	static async create<B extends ArrayBuffer | Blob = Blob>(websocket: WebSocket): Promise<WebSocketCommunicator<B>> {
+	static async create<B extends ArrayBuffer | Blob = Blob>(websocket: WebSocket): Promise<Sock<B>> {
 		console.log("establishing socket")
 		let
 			ready_resolver: (value: true) => void,
@@ -55,7 +52,6 @@ export class WebSocketCommunicator<B extends ArrayBuffer | Blob = Blob> {
 			ready_resolver = resolve
 			ready_rejector = reject
 		})
-		console.log(websocket.readyState)
 		switch (websocket.readyState) {
 			case websocket.OPEN: { ready_resolver!(true); break }
 			case websocket.CONNECTING: {
