@@ -29,6 +29,26 @@ interface WorkerPluginSetupConfig {
 	 * @defaultValue `(path) => path.replace(/\?worker$/, "")` (strips away any "?worker" suffix)
 	*/
 	rename: (path: string) => string
+
+	/** use existing plugins in the child build-process.
+	 * the plugins are acquired via `build.initialOptions`.
+	 * 
+	 * this could be useful if your worker scripts perform imports which esbuild cannot natively resolve,
+	 * such as `http://`, `jsr:`, and `npm:` imports (these are typically understood by newer runtimes like deno and bun).
+	 * 
+	 * however, do note that the `workerPlugin` itself will be stripped out of the list of plugins,
+	 * since that will lead to an endless recursion of build processes.
+	 * 
+	 * @defaultValue `false`
+	*/
+	usePlugins: boolean
+
+	/** **internal use only:** this is a self-reference to the generated `workerPlugin` object,
+	 * so that it can be filtered out of the list of plugins, when {@link usePlugins} is enabled.
+	 * 
+	 * this value is required, but I've left it as optional since it cannot be statically defined in `defaultWorkerPluginSetupConfig`.
+	*/
+	selfPlugin?: esbuild.Plugin
 }
 
 const defaultWorkerPluginSetupConfig: WorkerPluginSetupConfig = {
@@ -36,17 +56,24 @@ const defaultWorkerPluginSetupConfig: WorkerPluginSetupConfig = {
 	withFilter: (() => true),
 	namespaceFilter: (() => true),
 	rename: ((path) => path.replace(/\?worker$/, "")),
+	usePlugins: false,
 }
 
-const workerPluginSetup = (config: Partial<WorkerPluginSetupConfig>) => {
+/** turn optional properties `P` of interface `T` into required */
+type Require<T, P extends keyof T> = Omit<T, P> & Required<Pick<T, P>>
+
+const workerPluginSetup = (config: Require<Partial<WorkerPluginSetupConfig>, "selfPlugin">) => {
 	const
-		{ filters, withFilter, namespaceFilter, rename } = { ...defaultWorkerPluginSetupConfig, ...config },
+		{ filters, withFilter, namespaceFilter, rename, usePlugins, selfPlugin } = { ...defaultWorkerPluginSetupConfig, ...config },
 		ALREADY_CAPTURED = Symbol("[workerPluginSetup]: already captured by resolver."),
 		plugin_ns = "oazmi-worker"
 
 	return async (build: esbuild.PluginBuild): Promise<void> => {
 		const
-			{ plugins: _0, entryPoints: _1, ...rest_initial_options } = build.initialOptions
+			{ plugins = [], entryPoints: _0, ...rest_initial_options } = build.initialOptions,
+			initial_plugins = usePlugins
+				? plugins.filter((initial_plugin) => (initial_plugin !== selfPlugin))
+				: []
 
 		filters.forEach((filter) => {
 			build.onResolve({ filter }, async (args): Promise<esbuild.OnResolveResult | undefined> => {
@@ -86,6 +113,7 @@ const workerPluginSetup = (config: Partial<WorkerPluginSetupConfig>) => {
 			// with a variable pertaining to the relative path to the bundled worker file.
 			const result = await build.esbuild.build({
 				...rest_initial_options,
+				plugins: initial_plugins,
 				entryPoints: [path],
 				format: "esm",
 				bundle: true,
@@ -102,8 +130,10 @@ const workerPluginSetup = (config: Partial<WorkerPluginSetupConfig>) => {
 const workerPlugin = (config?: Partial<WorkerPluginSetupConfig>): esbuild.Plugin => {
 	const self_plugin: esbuild.Plugin = {
 		name: "oazmi-worker",
-		setup: workerPluginSetup({ ...config }),
+		setup: () => { },
 	}
+	const setup = workerPluginSetup({ ...config, selfPlugin: self_plugin })
+	self_plugin.setup = setup
 	return self_plugin
 }
 
