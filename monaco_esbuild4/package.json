@@ -1,0 +1,16 @@
+{
+	"type": "module",
+	"devDependencies": {
+		"@types/node": "^22.13.10",
+		"esbuild": "^0.25.1",
+		"monaco-editor": "^0.52.2",
+		"serve": "^14.2.4"
+	},
+	"scripts": {
+		"build": "node --experimental-strip-types \"./build.ts\"",
+		"serve": "npx serve -p 8000 \"./dist/\""
+	},
+	"engines": {
+		"node": ">=22.6.0"
+	}
+}
