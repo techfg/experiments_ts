@@ -5,18 +5,42 @@ import fs from "node:fs/promises"
 interface WorkerPluginSetupConfig {
 	/** the path-name filters which should be used for capturing worker scripts.
 	 * 
-	 * @defaultValue `[/\.worker(\.[cm]?[jt][sx])?$/]` (captures ".worker" js/ts files)
+	 * @defaultValue `[/\.worker(\.[cm]?[jt][sx])?$/, /\?worker$/]` (captures ".worker" js/ts files, and paths ending with the "?worker" suffix)
 	*/
 	filters: RegExp[]
+
+	/** in addition to the path-name filters, you can inspect the `"with"` import attributes of the incoming resource,
+	 * to decide if it should be processed by this plugin.
+	 * 
+	 * @defaultValue `() => true` (no filteration occurs, and all resources pass though)
+	*/
+	withFilter: (with_attributes: Record<string, string>) => boolean
+
+	/** add an additional filter which ensures that only desired `namespace`s are processed.
+	 * esbuild's default namespaces are `""` and `"file"`.
+	 * 
+	 * @defaultValue `() => true` (no filteration occurs, and resources from all `namespace`s pass though)
+	*/
+	namespaceFilter: (namespace: string) => boolean
+
+	/** rename the path string of the incoming resource.
+	 * this could be useful for stripping away suffixes, such as the conventional `"?worker"` suffix used by some popular bundlers.
+	 * 
+	 * @defaultValue `(path) => path.replace(/\?worker$/, "")` (strips away any "?worker" suffix)
+	*/
+	rename: (path: string) => string
 }
 
 const defaultWorkerPluginSetupConfig: WorkerPluginSetupConfig = {
-	filters: [/\.worker(\.[cm]?[jt][sx])?$/],
+	filters: [/\.worker(\.[cm]?[jt][sx])?$/, /\?worker$/],
+	withFilter: (() => true),
+	namespaceFilter: (() => true),
+	rename: ((path) => path.replace(/\?worker$/, "")),
 }
 
 const workerPluginSetup = (config: Partial<WorkerPluginSetupConfig>) => {
 	const
-		{ filters } = { ...defaultWorkerPluginSetupConfig, ...config },
+		{ filters, withFilter, namespaceFilter, rename } = { ...defaultWorkerPluginSetupConfig, ...config },
 		ALREADY_CAPTURED = Symbol("[workerPluginSetup]: already captured by resolver."),
 		plugin_ns = "oazmi-worker"
 
@@ -27,14 +51,17 @@ const workerPluginSetup = (config: Partial<WorkerPluginSetupConfig>) => {
 		filters.forEach((filter) => {
 			build.onResolve({ filter }, async (args): Promise<esbuild.OnResolveResult | undefined> => {
 				const
-					{ path, pluginData = {}, ...rest_args } = args
+					{ path, pluginData = {}, ...rest_args } = args,
+					{ with: with_arg, namespace } = rest_args
 				// see the note that follow, which explains why we terminate early if this symbol is discovered.
 				if (pluginData[ALREADY_CAPTURED]) { return undefined }
+				if (!(withFilter(with_arg) && namespaceFilter(namespace))) { return undefined }
+				const renamed_path = rename(path)
 
 				// now, we let esbuild and its other plugins take care of the full path resolution.
 				// but since we don't want this resolver to re-process this resource (causing an infinite recursion),
 				// we have inserted a the `ALREADY_CAPTURED` symbol into the plugin data to terminate processing it again.
-				const { path: resolved_path, pluginData: resolved_plugin_data } = (await build.resolve(path, {
+				const { path: resolved_path, pluginData: resolved_plugin_data } = (await build.resolve(renamed_path, {
 					...rest_args,
 					pluginData: { ...pluginData, [ALREADY_CAPTURED]: true },
 				}))
@@ -95,7 +122,11 @@ await esbuild.build({
 		"./src/index.ts",
 		"./src/index.html",
 	],
-	plugins: [workerPlugin()],
+	plugins: [workerPlugin({
+		filters: [/.*/],
+		// below, we specify that only `import ... from "..." with { type: "monaco-worker" }` should be processed.
+		withFilter: (with_arg) => (with_arg.type === "monaco-worker"),
+	})],
 	loader: {
 		".ttf": "copy", // <-- this loader-rule is crucial for bundling the monaco-editor.
 		".html": "copy", // <-- this allows us to copy the "./src/index.html" file as is.
