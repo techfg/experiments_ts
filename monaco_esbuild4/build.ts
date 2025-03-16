@@ -290,6 +290,7 @@ await esbuild.build({
 	platform: "browser",
 	sourcemap: true,
 	write: true,
+	logLevel: "debug"
 })
 
 console.log("bundled your monaco-editor page successfully!")
