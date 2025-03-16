@@ -267,7 +267,7 @@ await emptyDir(dist_dir)
 await esbuild.build({
 	entryPoints: [
 		"./src/index.ts",
-		"./src/index.html",
+		//"./src/index.html",
 	],
 	plugins: [workerPlugin({
 		filters: [/.*/],
@@ -279,7 +279,8 @@ await esbuild.build({
 		".html": "copy", // <-- this allows us to copy the "./src/index.html" file as is.
 		".txt": "file", // <-- needed for the file-path import performed by the "./src/demo_worker.ts" worker file.
 	},
-	outdir: dist_dir,
+	//outdir: dist_dir,
+	outfile: `${dist_dir}/runtime.js`,
 	// asset-names MUST be specified, and it may NOT contain the "[hash]" label, because that will break the references generated in the sub-build.
 	assetNames: "[ext]/[name]",
 	format: "esm",
