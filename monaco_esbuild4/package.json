@@ -1,6 +1,7 @@
 {
 	"type": "module",
 	"devDependencies": {
+		"@oazmi/kitchensink": "^0.9.8",
 		"@types/node": "^22.13.10",
 		"esbuild": "^0.25.1",
 		"monaco-editor": "^0.52.2",

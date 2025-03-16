@@ -1,4 +1,4 @@
-import { monacoEditor, monacoEnvironment, monacoLanguages } from "./monaco_loader.ts"
+import { demoWorker, monacoEditor, monacoEnvironment, monacoLanguages } from "./monaco_loader.ts"
 
 import "./style.css"
 
@@ -41,5 +41,11 @@ export const editor = monacoEditor.create(document.getElementById("monaco-editor
 	theme: "vs-dark",
 })
 
+demoWorker.onmessage = (event) => {
+	console.log(event.data)
+}
+// the worker will now respond with a hello world in your console every second
+setInterval(() => (demoWorker.postMessage("Say Hi!")), 1000)
+
 // we assign some variables to the global scope, so that they can be accessed from the dev-console in the browser.
-Object.assign(globalThis, { monacoEditor, monacoEnvironment, monacoLanguages })
+Object.assign(globalThis, { monacoEditor, monacoEnvironment, monacoLanguages, demoWorker })

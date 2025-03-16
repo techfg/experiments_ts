@@ -37,6 +37,8 @@ import htmlWorkerUrl from "monaco-editor/esm/vs/language/html/html.worker.js" wi
 import jsonWorkerUrl from "monaco-editor/esm/vs/language/json/json.worker.js" with { type: "monaco-worker" }
 // @ts-ignore: requires esbuild with a custom plugin for loading
 import tsWorkerUrl from "monaco-editor/esm/vs/language/typescript/ts.worker.js" with { type: "monaco-worker" }
+// @ts-ignore: requires esbuild with a custom plugin for loading
+import demoWorkerUrl from "./demo_worker.ts" with { type: "monaco-worker" }
 // importing the monaco editor itself
 import { editor as monacoEditor, languages as monacoLanguages, type Environment } from "monaco-editor"
 
@@ -73,9 +75,12 @@ const workerSubpathResolver = (worker_id: string, label: string): string | undef
 	}
 }
 
+const demoWorker = new Worker(import.meta.resolve(demoWorkerUrl), { type: "module" })
+
 export {
 	monacoEditor,
 	monacoEnvironment,
-	monacoLanguages
+	monacoLanguages,
+	demoWorker,
 }
 
