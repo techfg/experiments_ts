@@ -120,6 +120,7 @@ const workerPluginSetup = (config: Require<Partial<WorkerPluginSetupConfig>, "se
 				splitting: false,
 				minify: true,
 				write: false,
+				sourcemap: true
 			})
 			const contents = result.outputFiles.at(0)!.contents
 			return { contents, loader: "file", pluginData }
@@ -167,6 +168,7 @@ await esbuild.build({
 	splitting: false,
 	minifySyntax: true,
 	platform: "browser",
+	sourcemap: true
 })
 
 console.log("bundled your monaco-editor page successfully!")
