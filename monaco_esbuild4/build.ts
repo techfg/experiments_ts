@@ -92,10 +92,17 @@ const workerPluginSetup = (config: Require<Partial<WorkerPluginSetupConfig>, "se
 
 	return async (build: esbuild.PluginBuild): Promise<void> => {
 		const
-			{ plugins = [], entryPoints: _0, ...rest_initial_options } = build.initialOptions,
+			{ plugins = [], assetNames: initial_assetNames = "[name]-[hash]", entryPoints: _0, ...rest_initial_options } = build.initialOptions,
 			initial_plugins = usePlugins
 				? plugins.filter((initial_plugin) => (initial_plugin !== selfPlugin))
 				: []
+
+		// NOTICE: the default value that we set for `initial_assetNames` is intentionally made so that it raises an error.
+		//   this is because multi-asset bundle files will have their references break if there isn't a consistency between the internal build's and the user's top-level build config.
+		//   moreover, the user cannot declare a `[hash]` on their asset's name at the top-level build, because that will lead to double hashing of the emitted resources,
+		//   to see what I'm referring to, comment out the `throw Error` statement, and you'll see that additional assets will be labeled as `[name]-[hash]-[hash]`,
+		//   however, the worker that bundled them will still refer to them as `[name]-[hash]` (i.e. broken reference).
+		if (initial_assetNames.includes("[hash]")) { throw new Error(`[workerPluginSetup] your "assetNames" build option cannot contain the "[hash]" label in it, because then the external build process will break the internal build result's original asset referencing. for starters, we recommend that you use "[ext]/[name]" instead.`) }
 
 		filters.forEach((filter) => {
 			build.onResolve({ filter }, async (args): Promise<esbuild.OnResolveResult | undefined> => {
@@ -137,6 +144,11 @@ const workerPluginSetup = (config: Require<Partial<WorkerPluginSetupConfig>, "se
 				...rest_initial_options,
 				plugins: initial_plugins,
 				entryPoints: [path],
+				// overwriting the asset-names and entry-names, so that they reflect exactly what the user's top-level build-config has, in addition to the hash.
+				// if this step is not performed, the links/references generated from this sub-build will not be correct when the user's top-level build moves around the resulting files.
+				// thus, we must imitate the same exact same structure as the user's top-level config (excluding the hash).
+				assetNames: initial_assetNames + "-[hash]",
+				entryNames: initial_assetNames + "-[hash]",
 				format: "esm",
 				bundle: true,
 				splitting: false,
@@ -197,7 +209,7 @@ const workerPluginSetup = (config: Require<Partial<WorkerPluginSetupConfig>, "se
 			assets_importer_js_lines.push(`export { ${entry_points_asset_ids.map((asset_id) => ("asset_" + asset_id)).join(", ")} }`)
 			const default_export_asset_id = entry_points_asset_ids.at(0)
 			if (default_export_asset_id !== undefined) { assets_importer_js_lines.push(`export default asset_${default_export_asset_id}`) }
-
+			// console.log(Object.entries(result.metafile.outputs).map(([k, v]) => k))
 			const contents = assets_importer_js_lines.join("\n")
 			return { contents, loader: "js", pluginData: { ...pluginData, [REQUIRES_ADDITIONAL_ASSETS_RESOLVER]: true } }
 		})
@@ -208,6 +220,8 @@ const workerPluginSetup = (config: Require<Partial<WorkerPluginSetupConfig>, "se
 			const
 				asset_file = assets_dict.get(asset_id)!,
 				original_output_path = asset_file.path
+			// TODO: there is an issue with double hashing of the output-path.
+			//   how do I reliably remove the hashing text without enforcing a certain asset naming convention on the user's build initial config?
 			return {
 				path: original_output_path,
 				namespace: assets_plugin_ns,
@@ -263,8 +277,11 @@ await esbuild.build({
 	loader: {
 		".ttf": "copy", // <-- this loader-rule is crucial for bundling the monaco-editor.
 		".html": "copy", // <-- this allows us to copy the "./src/index.html" file as is.
+		".txt": "file", // <-- needed for the file-path import performed by the "./src/demo_worker.ts" worker file.
 	},
 	outdir: dist_dir,
+	// asset-names MUST be specified, and it may NOT contain the "[hash]" label, because that will break the references generated in the sub-build.
+	assetNames: "[ext]/[name]",
 	format: "esm",
 	bundle: true,
 	splitting: false,
