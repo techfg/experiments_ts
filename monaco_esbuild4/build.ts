@@ -1,3 +1,4 @@
+import { pathToPosixPath, trimDotSlashes } from "@oazmi/kitchensink/pathman"
 import esbuild from "esbuild"
 import fs from "node:fs/promises"
 
@@ -62,11 +63,32 @@ const defaultWorkerPluginSetupConfig: WorkerPluginSetupConfig = {
 /** turn optional properties `P` of interface `T` into required */
 type Require<T, P extends keyof T> = Omit<T, P> & Required<Pick<T, P>>
 
+/** given a long `path`, and given a set of `stems` (suffixes), check if any one of the stems suffixes match with the long `path`. */
+const pathStemMatches = (path: string, stems: Array<string>): boolean => {
+	path = pathToPosixPath(path)
+	const path_length = path.length
+	for (const stem of stems) {
+		const trimmed_stem = trimDotSlashes(pathToPosixPath(stem))
+			.replace(/^(\.\.\/)+/, "")
+			.replace(/^(\/)+/, "")
+		if (path_length === trimmed_stem.length && path === trimmed_stem) { return true }
+		if (path.endsWith("/" + trimmed_stem)) { return true }
+	}
+	return false
+}
+
 const workerPluginSetup = (config: Require<Partial<WorkerPluginSetupConfig>, "selfPlugin">) => {
 	const
 		{ filters, withFilter, namespaceFilter, rename, usePlugins, selfPlugin } = { ...defaultWorkerPluginSetupConfig, ...config },
-		ALREADY_CAPTURED = Symbol("[workerPluginSetup]: already captured by resolver."),
-		plugin_ns = "oazmi-worker"
+		ALREADY_CAPTURED_BY_WORKER_RESOLVER = Symbol("[workerPluginSetup]: already captured by worker-filter resolver."),
+		REQUIRES_ADDITIONAL_ASSETS_RESOLVER = Symbol("[workerPluginSetup]: this virtual asset needs a special resolver."),
+		PLUGIN_DATA_ASSET_FILE_FIELD = Symbol("[workerPluginSetup]: a field for embedding a virtual asset file in the plugin data."),
+		plugin_ns = "oazmi-worker",
+		assets_plugin_ns = "oazmi-worker-assets",
+		// a global dictionary of additional virtual assets that need to be bundled. `keys = unique-id`, `value = the virtual file`
+		assets_dict = new Map<string, esbuild.OutputFile>()
+
+	let asset_id_counter = 0
 
 	return async (build: esbuild.PluginBuild): Promise<void> => {
 		const
@@ -81,7 +103,7 @@ const workerPluginSetup = (config: Require<Partial<WorkerPluginSetupConfig>, "se
 					{ path, pluginData = {}, ...rest_args } = args,
 					{ with: with_arg, namespace } = rest_args
 				// see the note that follow, which explains why we terminate early if this symbol is discovered.
-				if (pluginData[ALREADY_CAPTURED]) { return undefined }
+				if (pluginData[ALREADY_CAPTURED_BY_WORKER_RESOLVER] || pluginData[REQUIRES_ADDITIONAL_ASSETS_RESOLVER]) { return undefined }
 				if (!(withFilter(with_arg) && namespaceFilter(namespace))) { return undefined }
 				const renamed_path = rename(path)
 
@@ -90,7 +112,7 @@ const workerPluginSetup = (config: Require<Partial<WorkerPluginSetupConfig>, "se
 				// we have inserted a the `ALREADY_CAPTURED` symbol into the plugin data to terminate processing it again.
 				const { path: resolved_path, pluginData: resolved_plugin_data } = (await build.resolve(renamed_path, {
 					...rest_args,
-					pluginData: { ...pluginData, [ALREADY_CAPTURED]: true },
+					pluginData: { ...pluginData, [ALREADY_CAPTURED_BY_WORKER_RESOLVER]: true },
 				}))
 				// if the `resolved_path` is `undefined` or an empty string (thereby falsy),
 				// then we'll give up trying to process this file.
@@ -101,7 +123,7 @@ const workerPluginSetup = (config: Require<Partial<WorkerPluginSetupConfig>, "se
 					namespace: plugin_ns,
 					pluginData: resolved_plugin_data
 						? resolved_plugin_data
-						: { ...pluginData, [ALREADY_CAPTURED]: false }
+						: { ...pluginData, [ALREADY_CAPTURED_BY_WORKER_RESOLVER]: false }
 				}
 			})
 		})
@@ -120,9 +142,90 @@ const workerPluginSetup = (config: Require<Partial<WorkerPluginSetupConfig>, "se
 				splitting: false,
 				minify: true,
 				write: false,
+				metafile: true,
 			})
-			const contents = result.outputFiles.at(0)!.contents
-			return { contents, loader: "file", pluginData }
+
+			// normally, after the bundling, you would only receive a single javascript file (that of the worker),
+			// and in such cases, just returning the contents of it with the "file" loader is enough (which is what we carry out below).
+			if (result.outputFiles.length === 0) { throw new Error("[workerPluginSetup] no file was produced by the worker-bundler. very weird, indeed.") }
+			if (result.outputFiles.length === 1) {
+				const contents = result.outputFiles.at(0)!.contents
+				return { contents, loader: "file", pluginData }
+			}
+
+			// however, when the `sourcemap` option is enabled, or if there is a plugin that also emits additional files,
+			// then we'd need to include them in our bundle as well.
+			// to do that, first we will need to identify the actual original entry-point file that got transformed.
+			// after that, we'll:
+			// - collect the list of all additional files which were generated.
+			// - assign each a globally-unique-id that is recognizable by a custom virtual assets resolver of ours.
+			// - create a new virtual javascript file that imports all of the virtual file resources,
+			//   and exports the main worker file (which too will be virtual) as the default export.
+
+			const allEntryPoints = [...(new Set(
+				Object.entries(result.metafile.outputs)
+					.filter(([relative_output_path, meta]) => meta.entryPoint ? true : false)
+					.map(([relative_output_path, meta]) => relative_output_path)
+			))]
+			if (allEntryPoints.length !== 1) { console.warn("[workerPluginSetup] WARNING! there should have been exactly one single entry-point.\n\tnow we might incorrectly guess the js-worker file out of these options:", allEntryPoints) }
+
+			const
+				entry_points_asset_ids: string[] = [],
+				import_asset_ids: string[] = []
+			for (const virtual_file of result.outputFiles) {
+				const
+					asset_id = `${asset_id_counter++}`,
+					is_entry_point = pathStemMatches(virtual_file.path, allEntryPoints)
+				if (is_entry_point) { entry_points_asset_ids.push(asset_id) }
+				import_asset_ids.push(asset_id)
+				assets_dict.set(asset_id, virtual_file)
+			}
+			if (entry_points_asset_ids.length !== 1) { console.warn("[workerPluginSetup] WARNING! expected to identify exactly one entry-point virtual asset file, but instead found these entry-point assets:", entry_points_asset_ids) }
+
+			const assets_importer_js_lines = []
+			import_asset_ids.forEach((asset_id) => {
+				// notice that we import the same asset twice: the first being a static import, while the second is a dynamic import.
+				// this is because static imports are susceptible to esbuild's tree-shaking, while dynamic imports are not.
+				// and we do NOT want to tree-shake off the assets (such as sourcemap) which are not actually imported/utilized by the user's original entry-points.
+				// in order to preserve all assets (even the unused ones), we must perform a dynamic import on them.
+				// so you may now wonder why do we perform a static import then? that's because it does not require a top-level await keyword, thus it would work on older browsers.
+				// moreover, it will make it clear to you which files would have been tree-shaken had the dynamic import not existed.
+				// but do note that dynamic imports generate very ugly "__commonJS" and "__toESM" function statements as a means for esbuild to polyfill at the top-level, polluting the user's entry-points.
+				assets_importer_js_lines.push(`import asset_${asset_id} from "${asset_id}"`)
+				assets_importer_js_lines.push(`import("${asset_id}")`)
+			})
+			assets_importer_js_lines.push(`export { ${entry_points_asset_ids.map((asset_id) => ("asset_" + asset_id)).join(", ")} }`)
+			const default_export_asset_id = entry_points_asset_ids.at(0)
+			if (default_export_asset_id !== undefined) { assets_importer_js_lines.push(`export default asset_${default_export_asset_id}`) }
+
+			const contents = assets_importer_js_lines.join("\n")
+			return { contents, loader: "js", pluginData: { ...pluginData, [REQUIRES_ADDITIONAL_ASSETS_RESOLVER]: true } }
+		})
+
+		build.onResolve({ filter: /.*/, namespace: plugin_ns }, async (args): Promise<esbuild.OnResolveResult | undefined> => {
+			const { path: asset_id, pluginData = {} } = args
+			if (!pluginData[REQUIRES_ADDITIONAL_ASSETS_RESOLVER]) { return undefined }
+			const
+				asset_file = assets_dict.get(asset_id)!,
+				original_output_path = asset_file.path
+			return {
+				path: original_output_path,
+				namespace: assets_plugin_ns,
+				pluginData: { ...pluginData, [PLUGIN_DATA_ASSET_FILE_FIELD]: asset_file },
+			}
+		})
+
+		build.onLoad({ filter: /.*/, namespace: assets_plugin_ns }, async (args): Promise<esbuild.OnLoadResult> => {
+			const
+				{ path, pluginData = {} } = args,
+				asset_file = pluginData[PLUGIN_DATA_ASSET_FILE_FIELD] as (esbuild.OutputFile | undefined)
+			if (!asset_file) { throw new Error(`[workerPluginSetup] expected to find a virtual file in the plugin data, but found none for the virtual asset with the path: "${path}"`) }
+			// there is no need to propagate the plugin data anymore, since this is a terminal point.
+			// TODO: consider only using the "file" loader for tree-shakable contents (such as the actual worker file),
+			//   and using the "copy" loader for all other assets that need to be copied irrespectively,
+			//   but their references to are not actually utilized (such as sourcemaps).
+			//   doing so would significantly reduce the polluting "__commonJS" and "__toESM" statemetns that end up in the user's original entry-point.
+			return { contents: asset_file.contents, loader: "file" }
 		})
 	}
 }
@@ -167,6 +270,8 @@ await esbuild.build({
 	splitting: false,
 	minifySyntax: true,
 	platform: "browser",
+	sourcemap: true,
+	write: true,
 })
 
 console.log("bundled your monaco-editor page successfully!")
