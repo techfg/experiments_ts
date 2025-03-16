@@ -1,0 +1,21 @@
+{
+	"type": "module",
+	"devDependencies": {
+		"@monaco-editor/react": "^4.7.0",
+		"@types/node": "^22.13.10",
+		"@types/react": "^19.0.10",
+		"@types/react-dom": "^19.0.4",
+		"esbuild": "^0.25.1",
+		"monaco-editor": "^0.52.2",
+		"react": "^19.0.0",
+		"react-dom": "^19.0.0",
+		"serve": "^14.2.4"
+	},
+	"scripts": {
+		"build": "node --experimental-strip-types \"./build.ts\"",
+		"serve": "npx serve -p 8000 \"./dist/\""
+	},
+	"engines": {
+		"node": ">=22.6.0"
+	}
+}

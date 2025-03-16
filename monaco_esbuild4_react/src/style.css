@@ -1,0 +1,10 @@
+/* style.css */
+body {
+	background-color: #000000;
+}
+
+#root {
+	margin: 10vh auto;
+	width: 720px;
+	height: 20vh;
+}
